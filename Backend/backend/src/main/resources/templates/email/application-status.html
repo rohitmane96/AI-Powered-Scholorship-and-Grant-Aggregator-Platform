@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <title>Application Update – ScholarMatch AI</title>
+  <style>
+    body { font-family: Arial, sans-serif; background: #f4f7f9; margin: 0; padding: 0; }
+    .container { max-width: 600px; margin: 40px auto; background: #fff;
+                 border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,.1); overflow: hidden; }
+    .header  { background: #4f46e5; color: #fff; padding: 32px 40px; text-align: center; }
+    .header h1 { margin: 0; font-size: 24px; }
+    .body    { padding: 32px 40px; color: #374151; line-height: 1.6; }
+    .status  { display: inline-block; padding: 6px 16px; border-radius: 20px;
+               font-weight: bold; background: #e0e7ff; color: #3730a3; }
+    .footer  { text-align: center; padding: 16px; font-size: 12px; color: #9ca3af; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header"><h1>Application Update</h1></div>
+    <div class="body">
+      <p>Hi <strong th:text="${name}">Student</strong>,</p>
+      <p>Your application for <strong th:text="${scholarshipName}">Scholarship</strong>
+         has been updated.</p>
+      <p>New status: <span class="status" th:text="${status}">SUBMITTED</span></p>
+      <p>Log in to ScholarMatch AI to view the full details of your application.</p>
+    </div>
+    <div class="footer">&copy; 2024 ScholarMatch AI &bull; Group 32 – ICEM</div>
+  </div>
+</body>
+</html>

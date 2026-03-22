@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <title>Welcome to ScholarMatch AI</title>
+  <style>
+    body { font-family: Arial, sans-serif; background: #f4f7f9; margin: 0; padding: 0; }
+    .container { max-width: 600px; margin: 40px auto; background: #fff;
+                 border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,.1); overflow: hidden; }
+    .header  { background: linear-gradient(135deg, #4f46e5, #7c3aed);
+               color: #fff; padding: 40px; text-align: center; }
+    .header h1 { margin: 0 0 8px; font-size: 28px; }
+    .header p  { margin: 0; opacity: .85; }
+    .body    { padding: 32px 40px; color: #374151; line-height: 1.7; }
+    .feature { display: flex; align-items: flex-start; margin: 16px 0; }
+    .feature .icon { font-size: 24px; margin-right: 12px; }
+    .footer  { text-align: center; padding: 16px; font-size: 12px; color: #9ca3af; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>Welcome to ScholarMatch AI 🎓</h1>
+      <p>Your AI-powered scholarship companion</p>
+    </div>
+    <div class="body">
+      <p>Hi <strong th:text="${name}">Student</strong>,</p>
+      <p>Welcome aboard! We're excited to help you discover and apply for scholarships
+         that match your profile. Here's what you can do on ScholarMatch AI:</p>
+
+      <div class="feature"><span class="icon">🔍</span>
+        <div><strong>Discover Scholarships</strong> – Browse thousands of global opportunities.</div>
+      </div>
+      <div class="feature"><span class="icon">🤖</span>
+        <div><strong>AI Matching</strong> – Get personalised recommendations based on your profile.</div>
+      </div>
+      <div class="feature"><span class="icon">📋</span>
+        <div><strong>Track Applications</strong> – Manage all your applications in one place.</div>
+      </div>
+      <div class="feature"><span class="icon">🔔</span>
+        <div><strong>Stay Notified</strong> – Get deadline reminders and status updates.</div>
+      </div>
+
+      <p>Start by completing your profile to get the most accurate recommendations.</p>
+      <p><strong>Team ScholarMatch AI</strong><br/>Group 32 – Indira College of Engineering and Management</p>
+    </div>
+    <div class="footer">&copy; 2024 ScholarMatch AI</div>
+  </div>
+</body>
+</html>

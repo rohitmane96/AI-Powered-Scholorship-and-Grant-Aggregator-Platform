@@ -1,0 +1,84 @@
+plugins {
+    id 'java'
+    id 'org.springframework.boot' version '3.4.0'
+    id 'io.spring.dependency-management' version '1.1.7'
+}
+
+group = 'com.scholarship'
+version = '1.0.0'
+description = 'ScholarMatch AI - Scholarship & Grant Aggregator Platform'
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
+}
+
+configurations {
+    compileOnly {
+        extendsFrom annotationProcessor
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+ext {
+    jwtVersion         = '0.12.3'
+    modelMapperVersion = '3.2.0'
+    springdocVersion   = '2.3.0'
+}
+
+dependencies {
+    // Spring Boot Core
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.boot:spring-boot-starter-security'
+    implementation 'org.springframework.boot:spring-boot-starter-data-mongodb'
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
+    implementation 'org.springframework.boot:spring-boot-starter-mail'
+    implementation 'org.springframework.boot:spring-boot-starter-thymeleaf'
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
+    implementation 'org.springframework.boot:spring-boot-starter-websocket'
+    implementation 'org.springframework.boot:spring-boot-starter-cache'
+    implementation 'org.springframework.boot:spring-boot-starter-aop'
+
+    // Thymeleaf Security Integration
+    implementation 'org.thymeleaf.extras:thymeleaf-extras-springsecurity6'
+
+    // JWT (JJWT 0.12.x)
+    implementation "io.jsonwebtoken:jjwt-api:${jwtVersion}"
+    runtimeOnly    "io.jsonwebtoken:jjwt-impl:${jwtVersion}"
+    runtimeOnly    "io.jsonwebtoken:jjwt-jackson:${jwtVersion}"
+
+    // ModelMapper – DTO <-> Entity conversions
+    implementation "org.modelmapper:modelmapper:${modelMapperVersion}"
+
+    // Springdoc / Swagger UI
+    implementation "org.springdoc:springdoc-openapi-starter-webmvc-ui:${springdocVersion}"
+
+    // Rate-limiting (Bucket4j)
+    implementation 'com.bucket4j:bucket4j-core:8.7.0'
+
+    // Apache Commons Utilities
+    implementation 'org.apache.commons:commons-lang3:3.14.0'
+    implementation 'commons-io:commons-io:2.15.1'
+
+    // Jackson JSR-310 (Java 8 date/time)
+    implementation 'com.fasterxml.jackson.datatype:jackson-datatype-jsr310'
+
+    // Lombok
+    compileOnly            'org.projectlombok:lombok:1.18.34'
+    annotationProcessor    'org.projectlombok:lombok:1.18.34'
+
+    // ---- Testing ----
+    testCompileOnly         'org.projectlombok:lombok:1.18.34'
+    testAnnotationProcessor 'org.projectlombok:lombok:1.18.34'
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testImplementation 'org.springframework.security:spring-security-test'
+    testImplementation 'de.flapdoodle.embed:de.flapdoodle.embed.mongo:4.16.2'
+    testRuntimeOnly    'org.junit.platform:junit-platform-launcher'
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+}
