@@ -8,16 +8,16 @@ export const notificationsApi = {
   },
 
   markAsRead: async (id: string): Promise<Notification> => {
-    const res = await api.put(`/api/notifications/${id}/read`)
+    const res = await api.patch(`/api/notifications/${id}/read`)
     return res.data
   },
 
   markAllAsRead: async (): Promise<void> => {
-    await api.put('/api/notifications/read-all')
+    await api.patch('/api/notifications/read-all')
   },
 
   getUnreadCount: async (): Promise<{ count: number }> => {
-    const res = await api.get('/api/notifications/unread-count')
-    return res.data
+    const res = await api.get('/api/notifications/unread')
+    return { count: typeof res.data === 'number' ? res.data : 0 }
   },
 }

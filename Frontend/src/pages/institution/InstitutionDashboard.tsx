@@ -19,33 +19,13 @@ import {
   ResponsiveContainer,
   Legend,
 } from 'recharts'
-import { applicationsApi } from '@/api/applications'
-import { scholarshipsApi } from '@/api/scholarships'
+import { institutionsApi } from '@/api/institutions'
 import { StatsCard } from '@/components/common/StatsCard'
 import { ApplicationStatusBadge } from '@/components/common/ApplicationStatus'
 import { EmptyState } from '@/components/common/EmptyState'
 import { SkeletonStats } from '@/components/ui/Spinner'
 import { Badge } from '@/components/ui/Badge'
 import { formatDate, formatCurrency } from '@/lib/utils'
-
-const mockApplicationsByScholarship = [
-  { name: 'Rhodes Scholarship', applications: 45 },
-  { name: 'Fulbright Program', applications: 32 },
-  { name: 'Gates Cambridge', applications: 28 },
-  { name: 'Chevening', applications: 19 },
-  { name: 'DAAD Fellowship', applications: 14 },
-]
-
-const mockApplicationsOverTime = [
-  { month: 'Aug', applications: 12 },
-  { month: 'Sep', applications: 19 },
-  { month: 'Oct', applications: 27 },
-  { month: 'Nov', applications: 34 },
-  { month: 'Dec', applications: 22 },
-  { month: 'Jan', applications: 41 },
-  { month: 'Feb', applications: 55 },
-  { month: 'Mar', applications: 48 },
-]
 
 const tooltipStyle = {
   backgroundColor: '#1e293b',
@@ -57,16 +37,18 @@ const tooltipStyle = {
 export default function InstitutionDashboard() {
   const { data: scholarshipsPage, isLoading: scholarsLoading } = useQuery({
     queryKey: ['institution', 'scholarships'],
-    queryFn: () => scholarshipsApi.getAll({ page: 0, size: 5 }),
+    queryFn: () => institutionsApi.getMyScholarships(0, 5),
   })
 
-  const { data: applicationsPage, isLoading: appsLoading } = useQuery({
-    queryKey: ['institution', 'applications'],
-    queryFn: () => applicationsApi.getMyApplications(0, 8),
+  const { data: dashboardStats } = useQuery({
+    queryKey: ['institution', 'dashboard'],
+    queryFn: institutionsApi.getDashboard,
   })
 
   const scholarships = scholarshipsPage?.content ?? []
-  const applications = applicationsPage?.content ?? []
+  const applications = dashboardStats?.recentApplications ?? []
+  const applicationsByScholarship = dashboardStats?.applicationsByScholarship ?? []
+  const applicationsOverTime = dashboardStats?.applicationsOverTime ?? []
 
   return (
     <div className="space-y-8">
@@ -82,25 +64,25 @@ export default function InstitutionDashboard() {
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           <StatsCard
             title="Total Scholarships"
-            value={scholarshipsPage?.totalElements ?? 0}
+            value={dashboardStats?.totalScholarships ?? scholarshipsPage?.totalElements ?? 0}
             icon={<BookOpen className="w-5 h-5" />}
             color="indigo"
           />
           <StatsCard
             title="Total Applications"
-            value={applicationsPage?.totalElements ?? 0}
+            value={dashboardStats?.totalApplications ?? applications.length ?? 0}
             icon={<Users className="w-5 h-5" />}
             color="purple"
           />
           <StatsCard
             title="Active Scholarships"
-            value={scholarships.filter(s => s.active).length}
+            value={dashboardStats?.activeScholarships ?? scholarships.filter(s => s.active).length}
             icon={<Zap className="w-5 h-5" />}
             color="emerald"
           />
           <StatsCard
             title="Avg Match Score"
-            value={72}
+            value={dashboardStats?.avgMatchScore ?? 0}
             suffix="%"
             icon={<TrendingUp className="w-5 h-5" />}
             color="cyan"
@@ -121,7 +103,7 @@ export default function InstitutionDashboard() {
             <h2 className="font-bold text-slate-100">Applications per Scholarship</h2>
           </div>
           <ResponsiveContainer width="100%" height={220}>
-            <BarChart data={mockApplicationsByScholarship}>
+            <BarChart data={applicationsByScholarship}>
               <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
               <XAxis dataKey="name" tick={{ fill: '#64748b', fontSize: 10 }} tickLine={false}
                 axisLine={false} interval={0} angle={-20} textAnchor="end" height={50} />
@@ -150,7 +132,7 @@ export default function InstitutionDashboard() {
             <h2 className="font-bold text-slate-100">Applications Over Time</h2>
           </div>
           <ResponsiveContainer width="100%" height={220}>
-            <LineChart data={mockApplicationsOverTime}>
+            <LineChart data={applicationsOverTime}>
               <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
               <XAxis dataKey="month" tick={{ fill: '#64748b', fontSize: 11 }} tickLine={false} axisLine={false} />
               <YAxis tick={{ fill: '#64748b', fontSize: 11 }} tickLine={false} axisLine={false} />
@@ -172,10 +154,10 @@ export default function InstitutionDashboard() {
       <div className="card-glass rounded-2xl">
         <div className="flex items-center justify-between p-5 border-b border-slate-800">
           <h2 className="font-bold text-slate-100">Recent Applications</h2>
-          <Badge variant="primary">{applicationsPage?.totalElements ?? 0} total</Badge>
-        </div>
+            <Badge variant="primary">{dashboardStats?.totalApplications ?? applications.length ?? 0} total</Badge>
+          </div>
 
-        {appsLoading ? (
+        {scholarsLoading ? (
           <div className="p-4 space-y-3">
             {Array.from({ length: 4 }).map((_, i) => (
               <div key={i} className="skeleton h-14 rounded-xl" />

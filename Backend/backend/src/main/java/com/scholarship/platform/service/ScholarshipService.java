@@ -79,6 +79,11 @@ public class ScholarshipService {
                     .findByFundingTypeAndDeletedFalseAndActiveTrue(fundingType, pageable)
                     .map(s -> toResponse(s, null));
         }
+        if (fieldOfStudy != null && !fieldOfStudy.isBlank()) {
+            return scholarshipRepository
+                    .findByFieldOfStudyContainingIgnoreCaseAndDeletedFalseAndActiveTrue(fieldOfStudy, pageable)
+                    .map(s -> toResponse(s, null));
+        }
         return listAll(page, size);
     }
 
@@ -105,8 +110,20 @@ public class ScholarshipService {
 
     public Page<ScholarshipResponse> search(String query, int page, int size) {
         Pageable pageable = PageRequest.of(page, size);
-        return scholarshipRepository.searchByText(query, pageable)
-                                    .map(s -> toResponse(s, null));
+        String normalizedQuery = query == null ? "" : query.trim();
+        if (normalizedQuery.isBlank()) {
+            return listAll(page, size);
+        }
+
+        try {
+            return scholarshipRepository.searchByText(normalizedQuery, pageable)
+                    .map(s -> toResponse(s, null));
+        } catch (RuntimeException ex) {
+            log.warn("Text search failed for query '{}', falling back to regex search: {}",
+                    normalizedQuery, ex.getMessage());
+            return scholarshipRepository.searchByKeyword(normalizedQuery, pageable)
+                    .map(s -> toResponse(s, null));
+        }
     }
 
     // ── Featured ───────────────────────────────────────────────────────────────

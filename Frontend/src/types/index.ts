@@ -241,6 +241,9 @@ export interface InstitutionStats {
   activeScholarships: number
   avgMatchScore: number
   applicationsThisMonth: number
+  applicationsByScholarship?: Array<{ name: string; applications: number }>
+  applicationsOverTime?: Array<{ month: string; applications: number }>
+  recentApplications?: Application[]
 }
 
 // ============================================================

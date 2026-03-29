@@ -37,12 +37,21 @@ public class DocumentController {
     private final FileStorageService fileStorageService;
     private final UserService        userService;
 
+    @Operation(summary = "List all documents uploaded by the current user")
+    @GetMapping
+    public ResponseEntity<ApiResponse<List<Document>>> listMine(
+            @AuthenticationPrincipal UserDetails principal) {
+
+        String userId = userService.getByEmail(principal.getUsername()).getId();
+        return ResponseEntity.ok(ApiResponse.ok(documentService.getByUser(userId)));
+    }
+
     @Operation(summary = "Upload a document for an application")
     @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<ApiResponse<Document>> upload(
             @AuthenticationPrincipal UserDetails principal,
             @RequestParam("file") MultipartFile file,
-            @RequestParam("applicationId") String applicationId,
+            @RequestParam(value = "applicationId", required = false) String applicationId,
             @RequestParam("type") DocumentType type) {
 
         String userId = userService.getByEmail(principal.getUsername()).getId();

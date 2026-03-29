@@ -97,24 +97,29 @@ public class UserService {
 
     public void deleteUser(String id) {
         User user = getById(id);
-        user.setDeleted(true);
-        userRepository.save(user);
-        log.info("User soft-deleted: {}", id);
+        userRepository.delete(user);
+        log.info("User hard-deleted: {}", id);
     }
 
     // ── Stats ──────────────────────────────────────────────────────────────────
 
     public java.util.Map<String, Object> getUserStats(String userId) {
-        long total     = applicationRepository.countByUserId(userId);
-        var accepted   = applicationRepository.findByUserIdAndStatus(
+        long total = applicationRepository.countByUserId(userId);
+        var accepted = applicationRepository.findByUserIdAndStatus(
                 userId, com.scholarship.platform.model.enums.ApplicationStatus.ACCEPTED).size();
-        var submitted  = applicationRepository.findByUserIdAndStatus(
+        var submitted = applicationRepository.findByUserIdAndStatus(
                 userId, com.scholarship.platform.model.enums.ApplicationStatus.SUBMITTED).size();
-
+        var underReview = applicationRepository.findByUserIdAndStatus(
+                userId, com.scholarship.platform.model.enums.ApplicationStatus.UNDER_REVIEW).size();
+        var rejected = applicationRepository.findByUserIdAndStatus(
+                userId, com.scholarship.platform.model.enums.ApplicationStatus.REJECTED).size();
         return java.util.Map.of(
                 "totalApplications", total,
                 "acceptedApplications", accepted,
                 "submittedApplications", submitted,
+                "underReviewApplications", underReview,
+                "rejectedApplications", rejected,
+                "shortlistedApplications", 0,
                 "successRate", total > 0 ? (accepted * 100.0 / total) : 0.0
         );
     }

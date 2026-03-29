@@ -21,6 +21,8 @@ public interface ApplicationRepository extends MongoRepository<Application, Stri
 
     Page<Application> findByScholarshipId(String scholarshipId, Pageable pageable);
 
+    Page<Application> findAll(Pageable pageable);
+
     List<Application> findByUserIdAndStatus(String userId, ApplicationStatus status);
 
     long countByUserId(String userId);
@@ -30,6 +32,8 @@ public interface ApplicationRepository extends MongoRepository<Application, Stri
     long countByScholarshipId(String scholarshipId);
 
     List<Application> findByScholarshipIdAndStatus(String scholarshipId, ApplicationStatus status);
+
+    List<Application> findByScholarshipIdIn(List<String> scholarshipIds);
 
     /** Returns all applications for a user (unpaged – use only for small result sets). */
     List<Application> findByUserId(String userId);

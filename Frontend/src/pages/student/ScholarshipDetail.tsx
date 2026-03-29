@@ -63,7 +63,7 @@ export default function ScholarshipDetail() {
 
   const { data: documents } = useQuery({
     queryKey: ['documents'],
-    queryFn: documentsApi.getDocuments,
+    queryFn: () => documentsApi.getDocuments(),
   })
 
   const { register, handleSubmit, formState: { errors }, watch } = useForm<ApplyFormData>({

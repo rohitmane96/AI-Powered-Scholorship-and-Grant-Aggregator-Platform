@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -54,6 +54,13 @@ export default function Profile() {
   const queryClient = useQueryClient()
   const [activeTab, setActiveTab] = useState('basic')
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
+  const [targetCountriesInput, setTargetCountriesInput] = useState('')
+  const [selectedFundingTypes, setSelectedFundingTypes] = useState<FundingType[]>([])
+  const [notificationPrefs, setNotificationPrefs] = useState({
+    email: true,
+    deadlineReminder: true,
+    newMatches: true,
+  })
   const fileRef = useRef<HTMLInputElement>(null)
 
   const { data: profile, isLoading } = useQuery({
@@ -125,9 +132,52 @@ export default function Profile() {
     avatarMutation.mutate(file)
   }
 
+  const displayUser = profile ?? user
+
+  useEffect(() => {
+    if (!displayUser) return
+
+    setTargetCountriesInput(displayUser.preferences?.targetCountries?.join(', ') ?? '')
+    setSelectedFundingTypes(displayUser.preferences?.fundingTypes ?? [])
+    setNotificationPrefs({
+      email: displayUser.preferences?.notifications?.email ?? true,
+      deadlineReminder: displayUser.preferences?.notifications?.deadlineReminder ?? true,
+      newMatches: displayUser.preferences?.notifications?.newMatches ?? true,
+      })
+  }, [displayUser])
+
   if (isLoading) return <PageSpinner />
 
-  const displayUser = profile ?? user
+  function toggleFundingType(fundingType: FundingType) {
+    setSelectedFundingTypes(current =>
+      current.includes(fundingType)
+        ? current.filter(value => value !== fundingType)
+        : [...current, fundingType]
+    )
+  }
+
+  function toggleNotificationPreference(key: 'email' | 'deadlineReminder' | 'newMatches') {
+    setNotificationPrefs(current => ({
+      ...current,
+      [key]: !current[key],
+    }))
+  }
+
+  function savePreferences() {
+    const existingPreferences = (displayUser?.preferences ?? {}) as Record<string, unknown>
+    const targetCountries = targetCountriesInput
+      .split(',')
+      .map(value => value.trim())
+      .filter(Boolean)
+
+    profileMutation.mutate({
+      preferences: {
+        ...existingPreferences,
+        targetCountries,
+        fundingTypes: selectedFundingTypes,
+      } as unknown as NonNullable<typeof displayUser>['preferences'],
+    })
+  }
 
   return (
     <div className="max-w-3xl space-y-6">
@@ -319,7 +369,8 @@ export default function Profile() {
                 <label className="text-sm font-medium text-slate-300 block mb-2">Target Countries</label>
                 <Input
                   placeholder="USA, UK, Germany, Australia..."
-                  defaultValue={displayUser?.preferences?.targetCountries?.join(', ')}
+                  value={targetCountriesInput}
+                  onChange={e => setTargetCountriesInput(e.target.value)}
                   hint="Comma-separated list of countries"
                 />
               </div>
@@ -331,7 +382,8 @@ export default function Profile() {
                     <label key={ft} className="flex items-center gap-2 p-3 rounded-xl border border-slate-700 hover:border-slate-600 cursor-pointer transition-colors">
                       <input
                         type="checkbox"
-                        defaultChecked={displayUser?.preferences?.fundingTypes?.includes(ft)}
+                        checked={selectedFundingTypes.includes(ft)}
+                        onChange={() => toggleFundingType(ft)}
                         className="w-4 h-4 rounded border-slate-600 bg-slate-800 text-indigo-500"
                       />
                       <span className="text-sm text-slate-300">{formatFundingType(ft)}</span>
@@ -352,15 +404,24 @@ export default function Profile() {
                       <span className="text-sm text-slate-300">{pref.label}</span>
                       <input
                         type="checkbox"
-                        defaultChecked={true}
+                        checked={notificationPrefs[pref.key as keyof typeof notificationPrefs]}
+                        onChange={() => toggleNotificationPreference(pref.key as 'email' | 'deadlineReminder' | 'newMatches')}
                         className="w-4 h-4 rounded border-slate-600 bg-slate-800 text-indigo-500"
                       />
                     </label>
                   ))}
                 </div>
+                <p className="text-xs text-slate-500">
+                  Notification toggles are kept in the UI, but the current backend profile API only stores target countries and funding types.
+                </p>
               </div>
 
-              <Button variant="primary" leftIcon={<Save className="w-4 h-4" />}>
+              <Button
+                variant="primary"
+                isLoading={profileMutation.isPending}
+                onClick={savePreferences}
+                leftIcon={<Save className="w-4 h-4" />}
+              >
                 Save Preferences
               </Button>
             </div>

@@ -6,6 +6,7 @@ import { z } from 'zod'
 import { motion, AnimatePresence } from 'framer-motion'
 import toast from 'react-hot-toast'
 import { Plus, Edit2, Trash2, Eye, EyeOff } from 'lucide-react'
+import { institutionsApi } from '@/api/institutions'
 import { scholarshipsApi } from '@/api/scholarships'
 import { DegreeLevel, FundingType, ScholarshipForm } from '@/types'
 import { formatDegreeLevel, formatFundingType, formatDate, formatCurrency, getDaysUntilDeadline, getDeadlineColor } from '@/lib/utils'
@@ -50,7 +51,7 @@ export default function ManageScholarships() {
 
   const { data, isLoading } = useQuery({
     queryKey: ['institution', 'my-scholarships', page],
-    queryFn: () => scholarshipsApi.getAll({ page, size: 10 }),
+    queryFn: () => institutionsApi.getMyScholarships(page, 10),
   })
 
   const { register, handleSubmit, formState: { errors }, reset, setValue } = useForm<ScholarshipFormData>({
@@ -234,22 +235,23 @@ export default function ManageScholarships() {
         title={editId ? 'Edit Scholarship' : 'Create New Scholarship'}
         size="xl"
       >
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-5 max-h-[70vh] overflow-y-auto scrollbar-thin pr-2">
-          <div className="grid grid-cols-2 gap-4">
+        <form onSubmit={handleSubmit(onSubmit)} className="flex max-h-[78vh] flex-col">
+          <div className="space-y-5 overflow-y-auto pr-1 sm:pr-2">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <Input label="Scholarship Name" error={errors.name?.message} {...register('name')} />
             <Input label="Provider/Institution" error={errors.provider?.message} {...register('provider')} />
           </div>
           <Textarea label="Description" rows={4} error={errors.description?.message} {...register('description')} />
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <Input label="Country" placeholder="USA" error={errors.country?.message} {...register('country')} />
             <Input label="Field of Study" placeholder="Computer Science" error={errors.fieldOfStudy?.message} {...register('fieldOfStudy')} />
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <NativeSelect label="Degree Level" options={degreeLevelOptions} error={errors.degreeLevel?.message} {...register('degreeLevel')} />
             <NativeSelect label="Funding Type" options={fundingTypeOptions} error={errors.fundingType?.message} {...register('fundingType')} />
           </div>
-          <div className="grid grid-cols-3 gap-4">
-            <div className="col-span-2">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+            <div className="md:col-span-2">
               <Input label="Funding Amount" type="number" min="0" placeholder="50000" error={errors.fundingAmount?.message} {...register('fundingAmount', { valueAsNumber: true })} />
             </div>
             <Input label="Currency" placeholder="USD" {...register('currency')} />
@@ -263,7 +265,8 @@ export default function ManageScholarships() {
             <input type="checkbox" className="w-4 h-4 rounded border-slate-600 bg-slate-800 text-indigo-500" {...register('featured')} />
             <span className="text-sm text-slate-300">Feature this scholarship (highlights it on the platform)</span>
           </label>
-          <div className="flex gap-3 pt-2 sticky bottom-0 bg-slate-900 pb-1">
+          </div>
+          <div className="mt-5 flex flex-col gap-3 border-t border-slate-800 pt-4 sm:flex-row">
             <Button type="button" variant="secondary" className="flex-1" onClick={() => { setFormOpen(false); setEditId(null); reset() }}>Cancel</Button>
             <Button type="submit" variant="primary" className="flex-1" isLoading={createMutation.isPending || updateMutation.isPending}>
               {editId ? 'Update' : 'Create'} Scholarship

@@ -1,6 +1,5 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
-import toast from 'react-hot-toast'
 import {
   Users,
   GraduationCap,
@@ -22,7 +21,7 @@ import {
   ResponsiveContainer,
   Legend,
 } from 'recharts'
-import { dashboardApi, adminApi } from '@/api/dashboard'
+import { adminApi } from '@/api/dashboard'
 import { StatsCard } from '@/components/common/StatsCard'
 import { ApplicationStatusBadge } from '@/components/common/ApplicationStatus'
 import { Badge } from '@/components/ui/Badge'
@@ -30,26 +29,7 @@ import { Button } from '@/components/ui/Button'
 import { SkeletonStats } from '@/components/ui/Spinner'
 import { EmptyState } from '@/components/common/EmptyState'
 import { formatDate, formatUserRole } from '@/lib/utils'
-import { ApplicationStatus, UserRole } from '@/types'
-
-const applicationStatusData = [
-  { name: 'Submitted', value: 45, color: '#6366f1' },
-  { name: 'Under Review', value: 30, color: '#f59e0b' },
-  { name: 'Shortlisted', value: 15, color: '#a855f7' },
-  { name: 'Accepted', value: 20, color: '#10b981' },
-  { name: 'Rejected', value: 25, color: '#f43f5e' },
-]
-
-const platformGrowth = [
-  { month: 'Aug', users: 120, scholarships: 45 },
-  { month: 'Sep', users: 180, scholarships: 52 },
-  { month: 'Oct', users: 250, scholarships: 68 },
-  { month: 'Nov', users: 320, scholarships: 75 },
-  { month: 'Dec', users: 280, scholarships: 80 },
-  { month: 'Jan', users: 410, scholarships: 95 },
-  { month: 'Feb', users: 520, scholarships: 110 },
-  { month: 'Mar', users: 640, scholarships: 128 },
-]
+import { UserRole } from '@/types'
 
 const tooltipStyle = {
   backgroundColor: '#1e293b',
@@ -65,11 +45,9 @@ const roleColors: Record<string, string> = {
 }
 
 export default function AdminDashboard() {
-  const queryClient = useQueryClient()
-
   const { data: stats, isLoading: statsLoading } = useQuery({
     queryKey: ['admin', 'stats'],
-    queryFn: dashboardApi.getStats,
+    queryFn: adminApi.getAdminAnalytics,
   })
 
   const { data: usersData, isLoading: usersLoading } = useQuery({
@@ -79,21 +57,18 @@ export default function AdminDashboard() {
 
   const { data: appsData } = useQuery({
     queryKey: ['admin', 'applications', 0],
-    queryFn: () => adminApi.getAdminApplications(0, 5),
-  })
-
-  const toggleUserMutation = useMutation({
-    mutationFn: ({ userId, active }: { userId: string; active: boolean }) =>
-      adminApi.updateUserStatus(userId, active),
-    onSuccess: () => {
-      toast.success('User status updated.')
-      queryClient.invalidateQueries({ queryKey: ['admin', 'users'] })
-    },
-    onError: () => toast.error('Failed to update user status.'),
+    queryFn: () => adminApi.getAdminApplications('', 0, 8),
   })
 
   const users = usersData?.content ?? []
   const applications = appsData?.content ?? []
+  const applicationStatusData = Array.isArray((stats as any)?.applicationStatusData)
+    ? (stats as any).applicationStatusData.map((item: any, index: number) => ({
+        ...item,
+        color: ['#6366f1', '#f59e0b', '#a855f7', '#10b981', '#f43f5e'][index] ?? '#64748b',
+      }))
+    : []
+  const platformGrowth = Array.isArray((stats as any)?.platformGrowth) ? (stats as any).platformGrowth : []
 
   return (
     <div className="space-y-8">
@@ -177,7 +152,7 @@ export default function AdminDashboard() {
                   paddingAngle={3}
                   dataKey="value"
                 >
-                  {applicationStatusData.map((entry, index) => (
+                  {applicationStatusData.map((entry: { color: string }, index: number) => (
                     <Cell key={index} fill={entry.color} />
                   ))}
                 </Pie>
@@ -185,7 +160,7 @@ export default function AdminDashboard() {
               </PieChart>
             </ResponsiveContainer>
             <div className="flex-1 space-y-2">
-              {applicationStatusData.map(item => (
+              {applicationStatusData.map((item: { name: string; value: number; color: string }) => (
                 <div key={item.name} className="flex items-center justify-between text-sm">
                   <div className="flex items-center gap-2">
                     <div className="w-2.5 h-2.5 rounded-full" style={{ background: item.color }} />

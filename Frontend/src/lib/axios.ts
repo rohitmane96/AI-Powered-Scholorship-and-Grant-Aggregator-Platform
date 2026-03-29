@@ -1,7 +1,7 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios'
 import { useAuthStore } from '@/store/authStore'
 
-const BASE_URL = 'http://localhost:8080'
+const BASE_URL = import.meta.env.VITE_API_BASE_URL?.trim() || 'http://localhost:8080'
 
 export const api = axios.create({
   baseURL: BASE_URL,
@@ -10,6 +10,19 @@ export const api = axios.create({
   },
   timeout: 30000,
 })
+
+function unwrapApiResponse<T>(payload: T) {
+  if (
+    payload &&
+    typeof payload === 'object' &&
+    'success' in payload &&
+    'data' in payload
+  ) {
+    return (payload as { data: unknown }).data
+  }
+
+  return payload
+}
 
 // Track if we're currently refreshing to avoid infinite loops
 let isRefreshing = false
@@ -43,7 +56,14 @@ api.interceptors.request.use(
 
 // Response interceptor: handle 401 and token refresh
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    if (response.config.responseType === 'blob' || response.config.responseType === 'arraybuffer') {
+      return response
+    }
+
+    response.data = unwrapApiResponse(response.data)
+    return response
+  },
   async (error: AxiosError) => {
     const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean }
 
@@ -72,7 +92,15 @@ api.interceptors.response.use(
 
       try {
         const response = await axios.post(`${BASE_URL}/api/auth/refresh`, { refreshToken })
-        const { token } = response.data
+        const refreshed = unwrapApiResponse(response.data) as {
+          accessToken?: string
+          token?: string
+        }
+        const token = refreshed.accessToken ?? refreshed.token
+
+        if (!token) {
+          throw new Error('Refresh response did not contain an access token')
+        }
 
         useAuthStore.getState().setToken(token)
         processQueue(null, token)

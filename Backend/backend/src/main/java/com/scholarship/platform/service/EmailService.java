@@ -33,8 +33,8 @@ public class EmailService {
     @Value("${spring.mail.username}")
     private String fromEmail;
 
-    @Value("${server.port:8080}")
-    private String serverPort;
+    @Value("${app.frontend-url:http://localhost:5173}")
+    private String frontendUrl;
 
     // ── Public API ─────────────────────────────────────────────────────────────
 
@@ -43,8 +43,7 @@ public class EmailService {
         Context ctx = new Context();
         ctx.setVariable("name",  user.getFullName());
         ctx.setVariable("token", user.getVerificationToken());
-        ctx.setVariable("verifyUrl",
-                "http://localhost:3000/verify-email?token=" + user.getVerificationToken());
+        ctx.setVariable("verifyUrl", frontendUrl + "/verify-email?token=" + user.getVerificationToken());
 
         sendHtmlEmail(user.getEmail(), "Verify your ScholarMatch AI account",
                       Constants.EMAIL_TEMPLATE_VERIFY, ctx);
@@ -54,8 +53,7 @@ public class EmailService {
     public void sendPasswordResetEmail(User user, String token) {
         Context ctx = new Context();
         ctx.setVariable("name",     user.getFullName());
-        ctx.setVariable("resetUrl",
-                "http://localhost:3000/reset-password?token=" + token);
+        ctx.setVariable("resetUrl", frontendUrl + "/reset-password?token=" + token);
 
         sendHtmlEmail(user.getEmail(), "Reset your ScholarMatch AI password",
                       Constants.EMAIL_TEMPLATE_RESET_PWD, ctx);
@@ -109,6 +107,24 @@ public class EmailService {
             log.info("Email '{}' sent to {}", subject, to);
         } catch (Exception ex) {
             log.error("Failed to send email to {}: {}", to, ex.getMessage());
+            logFallbackDetails(subject, to, ctx);
+        }
+    }
+
+    private void logFallbackDetails(String subject, String to, Context ctx) {
+        Object token = ctx.getVariable("token");
+        Object verifyUrl = ctx.getVariable("verifyUrl");
+        Object resetUrl = ctx.getVariable("resetUrl");
+
+        if (verifyUrl != null || token != null) {
+            log.warn("Email fallback for {} subject='{}' verifyUrl={} token={}",
+                    to, subject, verifyUrl, token);
+            return;
+        }
+
+        if (resetUrl != null) {
+            log.warn("Email fallback for {} subject='{}' resetUrl={}",
+                    to, subject, resetUrl);
         }
     }
 }

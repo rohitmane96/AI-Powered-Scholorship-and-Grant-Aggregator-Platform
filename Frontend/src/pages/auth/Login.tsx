@@ -1,10 +1,8 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { useForm } from 'react-hook-form'
-import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { motion } from 'framer-motion'
-import { Eye, EyeOff, GraduationCap, Sparkles } from 'lucide-react'
+import { Eye, EyeOff, Sparkles } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { useLogin } from '@/hooks/useAuth'
@@ -14,34 +12,48 @@ const loginSchema = z.object({
   password: z.string().min(6, 'Password must be at least 6 characters'),
 })
 
-type LoginFormData = z.infer<typeof loginSchema>
+type LoginErrors = {
+  email?: string
+  password?: string
+}
 
 export default function Login() {
   const [showPassword, setShowPassword] = useState(false)
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [errors, setErrors] = useState<LoginErrors>({})
   const { mutate: login, isPending } = useLogin()
 
-  const {
-    register,
-    handleSubmit,
-    formState: { errors },
-  } = useForm<LoginFormData>({
-    resolver: zodResolver(loginSchema),
-  })
+  function submitLogin() {
+    const parsed = loginSchema.safeParse({ email, password })
 
-  function onSubmit(data: LoginFormData) {
-    login(data)
+    if (!parsed.success) {
+      const fieldErrors = parsed.error.flatten().fieldErrors
+      const nextErrors: LoginErrors = {
+        email: fieldErrors.email?.[0],
+        password: fieldErrors.password?.[0],
+      }
+      console.log('[Login] validation blocked submit', nextErrors)
+      setErrors(nextErrors)
+      return
+    }
+
+    setErrors({})
+    console.log('[Login] onSubmit fired', {
+      email,
+      passwordLength: password.length,
+    })
+    login(parsed.data)
   }
 
   return (
     <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
-      {/* Background */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-indigo-600/10 rounded-full blur-3xl" />
         <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-purple-600/10 rounded-full blur-3xl" />
       </div>
 
       <div className="w-full max-w-md relative z-10">
-        {/* Logo */}
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -59,20 +71,24 @@ export default function Login() {
           <p className="text-slate-400 text-sm mt-1">Sign in to continue your scholarship journey</p>
         </motion.div>
 
-        {/* Card */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
           className="bg-slate-900/60 backdrop-blur-xl border border-slate-700/50 rounded-2xl p-8"
         >
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+          <div className="space-y-5">
             <Input
               label="Email Address"
               type="email"
               placeholder="you@example.com"
-              error={errors.email?.message}
-              {...register('email')}
+              autoComplete="email"
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Enter') submitLogin()
+              }}
+              error={errors.email}
             />
 
             <div>
@@ -80,7 +96,13 @@ export default function Login() {
                 label="Password"
                 type={showPassword ? 'text' : 'password'}
                 placeholder="••••••••"
-                error={errors.password?.message}
+                autoComplete="current-password"
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') submitLogin()
+                }}
+                error={errors.password}
                 rightIcon={
                   <button
                     type="button"
@@ -90,7 +112,6 @@ export default function Login() {
                     {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 }
-                {...register('password')}
               />
               <div className="flex justify-end mt-1.5">
                 <Link to="/forgot-password" className="text-xs text-indigo-400 hover:text-indigo-300">
@@ -100,7 +121,11 @@ export default function Login() {
             </div>
 
             <Button
-              type="submit"
+              type="button"
+              onClick={() => {
+                console.log('[Login] button click submit triggered')
+                submitLogin()
+              }}
               variant="primary"
               size="lg"
               isLoading={isPending}
@@ -108,7 +133,7 @@ export default function Login() {
             >
               {isPending ? 'Signing in...' : 'Sign In'}
             </Button>
-          </form>
+          </div>
 
           <div className="mt-6 text-center">
             <p className="text-sm text-slate-500">
@@ -120,7 +145,6 @@ export default function Login() {
           </div>
         </motion.div>
 
-        {/* Demo hint */}
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -132,7 +156,7 @@ export default function Login() {
             <div>
               <p className="text-xs font-semibold text-cyan-300">Demo Account</p>
               <p className="text-xs text-slate-400 mt-0.5">
-                Use any email/password or create a new account to explore the platform.
+                Use any valid registered account to sign in.
               </p>
             </div>
           </div>

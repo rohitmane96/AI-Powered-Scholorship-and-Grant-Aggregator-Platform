@@ -22,6 +22,8 @@ public interface ScholarshipRepository extends MongoRepository<Scholarship, Stri
 
     Page<Scholarship> findByDeletedFalse(Pageable pageable);
 
+    List<Scholarship> findAllByDeletedFalse();
+
     // ── Filtered queries ───────────────────────────────────────────────────────
 
     Page<Scholarship> findByCountryIgnoreCaseAndDeletedFalseAndActiveTrue(
@@ -32,6 +34,9 @@ public interface ScholarshipRepository extends MongoRepository<Scholarship, Stri
 
     Page<Scholarship> findByFundingTypeAndDeletedFalseAndActiveTrue(
             FundingType type, Pageable pageable);
+
+    Page<Scholarship> findByFieldOfStudyContainingIgnoreCaseAndDeletedFalseAndActiveTrue(
+            String fieldOfStudy, Pageable pageable);
 
     @Query("{ 'deadline': { $gte: ?0 }, 'deleted': false, 'active': true }")
     Page<Scholarship> findByDeadlineAfterAndDeletedFalseAndActiveTrue(
@@ -49,6 +54,22 @@ public interface ScholarshipRepository extends MongoRepository<Scholarship, Stri
     @Query("{ $text: { $search: ?0 }, 'deleted': false, 'active': true }")
     Page<Scholarship> searchByText(String query, Pageable pageable);
 
+    @Query("""
+        {
+          'deleted': false,
+          'active': true,
+          '$or': [
+            { 'name': { $regex: ?0, $options: 'i' } },
+            { 'provider': { $regex: ?0, $options: 'i' } },
+            { 'description': { $regex: ?0, $options: 'i' } },
+            { 'country': { $regex: ?0, $options: 'i' } },
+            { 'fieldOfStudy': { $regex: ?0, $options: 'i' } },
+            { 'tags': { $regex: ?0, $options: 'i' } }
+          ]
+        }
+        """)
+    Page<Scholarship> searchByKeyword(String query, Pageable pageable);
+
     // ── Recommendation candidates ──────────────────────────────────────────────
 
     @Query("{ 'country': ?0, 'degreeLevel': ?1, 'fieldOfStudy': ?2, 'deleted': false, 'active': true }")
@@ -57,6 +78,8 @@ public interface ScholarshipRepository extends MongoRepository<Scholarship, Stri
     // ── Institution queries ────────────────────────────────────────────────────
 
     Page<Scholarship> findByCreatedByAndDeletedFalse(String createdBy, Pageable pageable);
+
+    List<Scholarship> findByCreatedByAndDeletedFalse(String createdBy);
 
     // ── Stats ──────────────────────────────────────────────────────────────────
 

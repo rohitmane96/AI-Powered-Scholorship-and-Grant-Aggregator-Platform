@@ -1,5 +1,6 @@
 import api from '@/lib/axios'
 import { AuthResponse } from '@/types'
+import { mapUserResponse } from './mappers'
 
 export const authApi = {
   register: async (data: {
@@ -8,14 +9,33 @@ export const authApi = {
     email: string
     password: string
     role: string
+    institutionName?: string
+    institutionType?: string
+    country?: string
   }): Promise<AuthResponse> => {
-    const res = await api.post('/api/auth/register', data)
-    return res.data
+    const res = await api.post('/api/auth/register', {
+      fullName: `${data.firstName} ${data.lastName}`.trim(),
+      email: data.email,
+      password: data.password,
+      role: data.role,
+      institutionName: data.institutionName,
+      institutionType: data.institutionType,
+      country: data.country,
+    })
+    return {
+      token: res.data.accessToken,
+      refreshToken: res.data.refreshToken,
+      user: mapUserResponse(res.data),
+    }
   },
 
   login: async (data: { email: string; password: string }): Promise<AuthResponse> => {
     const res = await api.post('/api/auth/login', data)
-    return res.data
+    return {
+      token: res.data.accessToken,
+      refreshToken: res.data.refreshToken,
+      user: mapUserResponse(res.data),
+    }
   },
 
   refresh: async (refreshToken: string): Promise<{ token: string }> => {
@@ -28,7 +48,7 @@ export const authApi = {
   },
 
   verifyEmail: async (token: string): Promise<void> => {
-    await api.post(`/api/auth/verify-email?token=${token}`)
+    await api.post('/api/auth/verify-email', { token })
   },
 
   forgotPassword: async (email: string): Promise<void> => {

@@ -45,12 +45,12 @@ export default function Documents() {
 
   const { data: documents, isLoading } = useQuery({
     queryKey: ['documents'],
-    queryFn: documentsApi.getDocuments,
+    queryFn: () => documentsApi.getDocuments(),
   })
 
   const uploadMutation = useMutation({
     mutationFn: ({ file, type }: { file: File; type: DocumentType }) =>
-      documentsApi.uploadDocument(file, type, setUploadProgress),
+      documentsApi.uploadDocument(file, undefined, type, setUploadProgress),
     onSuccess: () => {
       toast.success('Document uploaded successfully!')
       setUploadProgress(0)
@@ -147,7 +147,7 @@ export default function Documents() {
             ref={fileRef}
             type="file"
             className="hidden"
-            accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.txt"
+            accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.webp"
             onChange={e => handleFiles(e.target.files)}
           />
 
@@ -166,7 +166,7 @@ export default function Documents() {
                 Drop file here or <span className="text-indigo-400">click to browse</span>
               </p>
               <p className="text-slate-500 text-sm mt-1">
-                PDF, DOC, DOCX, JPG, PNG up to 10MB
+                PDF, DOC, DOCX, JPG, PNG, WEBP up to 10MB
               </p>
             </>
           )}

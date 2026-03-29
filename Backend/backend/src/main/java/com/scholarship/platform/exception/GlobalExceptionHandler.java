@@ -8,6 +8,7 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
@@ -75,6 +76,21 @@ public class GlobalExceptionHandler {
                 .build();
 
         return ResponseEntity.badRequest().body(response);
+    }
+
+    @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
+    public ResponseEntity<ApiResponse<Void>> handleMethodNotSupported(
+            HttpRequestMethodNotSupportedException ex, HttpServletRequest request) {
+
+        String supported = ex.getSupportedHttpMethods() == null || ex.getSupportedHttpMethods().isEmpty()
+                ? "the required method"
+                : ex.getSupportedHttpMethods().iterator().next().name();
+
+        return buildErrorResponse(
+                "HTTP method not allowed. Use " + supported + " for this endpoint.",
+                "METHOD_NOT_ALLOWED",
+                HttpStatus.METHOD_NOT_ALLOWED,
+                request.getRequestURI());
     }
 
     // ── File upload ────────────────────────────────────────────────────────────

@@ -4,6 +4,7 @@ import { motion } from 'framer-motion'
 import toast from 'react-hot-toast'
 import { Eye, ChevronLeft, ChevronRight } from 'lucide-react'
 import { applicationsApi } from '@/api/applications'
+import { institutionsApi } from '@/api/institutions'
 import { ApplicationStatus } from '@/types'
 import { ApplicationStatusBadge } from '@/components/common/ApplicationStatus'
 import { Button } from '@/components/ui/Button'
@@ -28,10 +29,20 @@ export default function ViewApplications() {
   const [newStatus, setNewStatus] = useState<ApplicationStatus>(ApplicationStatus.UNDER_REVIEW)
   const [remarks, setRemarks] = useState('')
   const [reviewModalOpen, setReviewModalOpen] = useState(false)
+  const [scholarshipId, setScholarshipId] = useState('')
+
+  const { data: scholarshipsPage } = useQuery({
+    queryKey: ['institution', 'my-scholarships', 'selector'],
+    queryFn: () => institutionsApi.getMyScholarships(0, 100),
+  })
+
+  const scholarships = scholarshipsPage?.content ?? []
+  const selectedScholarshipId = scholarshipId || scholarships[0]?.id || ''
 
   const { data, isLoading } = useQuery({
-    queryKey: ['institution', 'all-applications', page],
-    queryFn: () => applicationsApi.getMyApplications(page, 10),
+    queryKey: ['institution', 'all-applications', selectedScholarshipId, page],
+    queryFn: () => applicationsApi.getByScholarship(selectedScholarshipId, page, 10),
+    enabled: !!selectedScholarshipId,
   })
 
   const { data: appDetail } = useQuery({
@@ -65,11 +76,20 @@ export default function ViewApplications() {
         </p>
       </div>
 
+      <NativeSelect
+        label="Scholarship"
+        value={selectedScholarshipId}
+        onChange={e => setScholarshipId(e.target.value)}
+        options={scholarships.map(s => ({ value: s.id, label: s.name }))}
+      />
+
       <div className="card-glass rounded-2xl overflow-hidden">
         {isLoading ? (
           <div className="divide-y divide-slate-800/50">
             {Array.from({ length: 6 }).map((_, i) => <SkeletonRow key={i} />)}
           </div>
+        ) : !selectedScholarshipId ? (
+          <EmptyState icon="🎓" title="No scholarships found" description="Create a scholarship before reviewing applications." />
         ) : applications.length === 0 ? (
           <EmptyState icon="📋" title="No applications yet" description="Applications will appear here when students apply to your scholarships." />
         ) : (

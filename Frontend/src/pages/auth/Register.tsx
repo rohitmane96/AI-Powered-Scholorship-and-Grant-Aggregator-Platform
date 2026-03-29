@@ -18,9 +18,38 @@ const registerSchema = z.object({
   password: z.string().min(8, 'Password must be at least 8 characters'),
   confirmPassword: z.string(),
   role: z.nativeEnum(UserRole),
+  institutionName: z.string().optional(),
+  institutionType: z.string().optional(),
+  country: z.string().optional(),
 }).refine(data => data.password === data.confirmPassword, {
   message: "Passwords don't match",
   path: ['confirmPassword'],
+}).superRefine((data, ctx) => {
+  if (data.role === UserRole.INSTITUTION) {
+    if (!data.institutionName || data.institutionName.trim().length < 2) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Institution name is required',
+        path: ['institutionName'],
+      })
+    }
+
+    if (!data.institutionType || data.institutionType.trim().length < 2) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Institution type is required',
+        path: ['institutionType'],
+      })
+    }
+
+    if (!data.country || data.country.trim().length < 2) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Country is required',
+        path: ['country'],
+      })
+    }
+  }
 })
 
 type RegisterFormData = z.infer<typeof registerSchema>
@@ -64,6 +93,8 @@ export default function Register() {
     register(data)
   }
 
+  const submitRegister = handleSubmit(onSubmit)
+
   return (
     <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4 py-12">
       {/* Background */}
@@ -98,7 +129,7 @@ export default function Register() {
           transition={{ delay: 0.1 }}
           className="bg-slate-900/60 backdrop-blur-xl border border-slate-700/50 rounded-2xl p-8"
         >
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+          <form onSubmit={submitRegister} noValidate className="space-y-5">
             {/* Role selection */}
             <div>
               <label className="text-sm font-medium text-slate-300 block mb-2">I am a...</label>
@@ -133,21 +164,50 @@ export default function Register() {
               <Input
                 label="First Name"
                 placeholder="John"
+                autoComplete="given-name"
                 error={errors.firstName?.message}
                 {...registerField('firstName')}
               />
               <Input
                 label="Last Name"
                 placeholder="Doe"
+                autoComplete="family-name"
                 error={errors.lastName?.message}
                 {...registerField('lastName')}
               />
             </div>
 
+            {selectedRole === UserRole.INSTITUTION && (
+              <>
+                <Input
+                  label="Institution Name"
+                  placeholder="Massachusetts Institute of Technology"
+                  error={errors.institutionName?.message}
+                  {...registerField('institutionName')}
+                />
+
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <Input
+                    label="Institution Type"
+                    placeholder="University"
+                    error={errors.institutionType?.message}
+                    {...registerField('institutionType')}
+                  />
+                  <Input
+                    label="Country"
+                    placeholder="US"
+                    error={errors.country?.message}
+                    {...registerField('country')}
+                  />
+                </div>
+              </>
+            )}
+
             <Input
               label="Email Address"
               type="email"
               placeholder="you@example.com"
+              autoComplete="email"
               error={errors.email?.message}
               {...registerField('email')}
             />
@@ -156,6 +216,7 @@ export default function Register() {
               label="Password"
               type={showPassword ? 'text' : 'password'}
               placeholder="Min. 8 characters"
+              autoComplete="new-password"
               error={errors.password?.message}
               hint="Must be at least 8 characters"
               rightIcon={
@@ -170,6 +231,7 @@ export default function Register() {
               label="Confirm Password"
               type={showConfirm ? 'text' : 'password'}
               placeholder="Re-enter password"
+              autoComplete="new-password"
               error={errors.confirmPassword?.message}
               rightIcon={
                 <button type="button" onClick={() => setShowConfirm(prev => !prev)} className="text-slate-400 hover:text-slate-200">
@@ -192,6 +254,7 @@ export default function Register() {
 
             <Button
               type="submit"
+              onClick={submitRegister}
               variant="primary"
               size="lg"
               isLoading={isPending}

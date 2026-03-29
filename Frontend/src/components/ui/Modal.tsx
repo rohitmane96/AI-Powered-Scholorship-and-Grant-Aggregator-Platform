@@ -42,37 +42,41 @@ export function Modal({ open, onClose, title, description, children, size = 'md'
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.95, y: 20 }}
                 transition={{ duration: 0.2 }}
-                className={cn(
-                  'fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-full',
-                  'bg-slate-900 border border-slate-700/50 rounded-2xl shadow-2xl shadow-black/50',
-                  sizes[size],
-                  className
-                )}
+                className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6"
                 onClick={e => e.stopPropagation()}
               >
-                {(title || description) && (
-                  <div className="flex items-start justify-between p-6 border-b border-slate-800">
-                    <div>
-                      {title && (
-                        <Dialog.Title className="text-lg font-semibold text-slate-100">
-                          {title}
-                        </Dialog.Title>
-                      )}
-                      {description && (
-                        <Dialog.Description className="text-sm text-slate-400 mt-1">
-                          {description}
-                        </Dialog.Description>
-                      )}
+                <div
+                  className={cn(
+                    'w-full max-h-[90vh] overflow-hidden',
+                    'bg-slate-900 border border-slate-700/50 rounded-2xl shadow-2xl shadow-black/50',
+                    sizes[size],
+                    className
+                  )}
+                >
+                  {(title || description) && (
+                    <div className="flex items-start justify-between p-6 border-b border-slate-800">
+                      <div>
+                        {title && (
+                          <Dialog.Title className="text-lg font-semibold text-slate-100">
+                            {title}
+                          </Dialog.Title>
+                        )}
+                        {description && (
+                          <Dialog.Description className="text-sm text-slate-400 mt-1">
+                            {description}
+                          </Dialog.Description>
+                        )}
+                      </div>
+                      <button
+                        onClick={onClose}
+                        className="p-2 rounded-lg text-slate-400 hover:text-slate-100 hover:bg-slate-800 transition-colors"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
                     </div>
-                    <button
-                      onClick={onClose}
-                      className="p-2 rounded-lg text-slate-400 hover:text-slate-100 hover:bg-slate-800 transition-colors"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
-                  </div>
-                )}
-                <div className="p-6">{children}</div>
+                  )}
+                  <div className="p-4 sm:p-6">{children}</div>
+                </div>
               </motion.div>
             </Dialog.Content>
           </Dialog.Portal>

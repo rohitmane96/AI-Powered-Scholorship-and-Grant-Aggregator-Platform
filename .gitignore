@@ -1,0 +1,12 @@
+.idea/
+.claude/
+
+Backend/backend/.gradle/
+Backend/backend/build/
+Backend/backend/uploads/
+
+Frontend/node_modules/
+Frontend/dist/
+
+*.log
+.DS_Store

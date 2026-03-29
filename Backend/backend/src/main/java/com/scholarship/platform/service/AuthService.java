@@ -12,6 +12,7 @@ import com.scholarship.platform.security.JwtTokenProvider;
 import com.scholarship.platform.util.Constants;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.*;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -35,16 +36,26 @@ public class AuthService {
     private final EmailService        emailService;
     private final NotificationService notificationService;
 
+    @Value("${app.frontend-url:http://localhost:5173}")
+    private String frontendUrl;
+
     // ── Registration ───────────────────────────────────────────────────────────
 
     public AuthResponse register(RegisterRequest request) {
-        if (userRepository.existsByEmail(request.getEmail())) {
-            throw new BadRequestException("Email is already registered", "EMAIL_TAKEN");
-        }
+        String normalizedEmail = request.getEmail().toLowerCase().trim();
+
+        userRepository.findByEmail(normalizedEmail).ifPresent(existing -> {
+            if (existing.isDeleted()) {
+                userRepository.delete(existing);
+                log.info("Removed previously deleted user record for email: {}", normalizedEmail);
+            } else {
+                throw new BadRequestException("Email is already registered", "EMAIL_TAKEN");
+            }
+        });
 
         User user = User.builder()
                 .fullName(request.getFullName())
-                .email(request.getEmail().toLowerCase().trim())
+                .email(normalizedEmail)
                 .password(passwordEncoder.encode(request.getPassword()))
                 .role(request.getRole())
                 .verified(false)
@@ -164,6 +175,9 @@ public class AuthService {
                 .role(user.getRole())
                 .verified(user.isVerified())
                 .profileCompletion(user.getProfileCompletion())
+                .verificationUrl(user.getVerificationToken() == null
+                        ? null
+                        : frontendUrl + "/verify-email?token=" + user.getVerificationToken())
                 .build();
     }
 }

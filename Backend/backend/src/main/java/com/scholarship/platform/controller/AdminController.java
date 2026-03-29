@@ -60,12 +60,15 @@ public class AdminController {
     @Operation(summary = "List all applications")
     @GetMapping("/applications")
     public ResponseEntity<ApiResponse<PageResponse<ApplicationResponse>>> listApplications(
-            @RequestParam String scholarshipId,
+            @RequestParam(required = false) String scholarshipId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
 
         return ResponseEntity.ok(ApiResponse.ok(
-                PageResponse.of(applicationService.getByScholarship(scholarshipId, page, size))));
+                PageResponse.of(
+                        scholarshipId != null && !scholarshipId.isBlank()
+                                ? applicationService.getByScholarship(scholarshipId, page, size)
+                                : applicationService.getAll(page, size))));
     }
 
     @Operation(summary = "Platform analytics / statistics")

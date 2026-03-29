@@ -21,6 +21,9 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 /**
  * Manages the full lifecycle of scholarship applications.
@@ -86,7 +89,12 @@ public class ApplicationService {
 
     public Page<ApplicationResponse> getByUser(String userId, int page, int size) {
         Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
-        return applicationRepository.findByUserId(userId, pageable).map(this::toResponse);
+        Page<Application> applications = applicationRepository.findByUserId(userId, pageable);
+        Map<String, Scholarship> scholarships = scholarshipRepository.findAllById(
+                        applications.getContent().stream().map(Application::getScholarshipId).distinct().toList())
+                .stream()
+                .collect(Collectors.toMap(Scholarship::getId, Function.identity()));
+        return applications.map(app -> toResponse(app, scholarships.get(app.getScholarshipId())));
     }
 
     public ApplicationResponse getById(String id, User actor) {
@@ -103,7 +111,41 @@ public class ApplicationService {
 
     public Page<ApplicationResponse> getByScholarship(String scholarshipId, int page, int size) {
         Pageable pageable = PageRequest.of(page, size, Sort.by("submittedAt").descending());
-        return applicationRepository.findByScholarshipId(scholarshipId, pageable).map(this::toResponse);
+        Scholarship scholarship = scholarshipRepository.findByIdAndDeletedFalse(scholarshipId).orElse(null);
+        return applicationRepository.findByScholarshipId(scholarshipId, pageable)
+                .map(app -> toResponse(app, scholarship));
+    }
+
+    public Page<ApplicationResponse> getAll(int page, int size) {
+        Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
+        Page<Application> applications = applicationRepository.findAll(pageable);
+        Map<String, Scholarship> scholarships = scholarshipRepository.findAllById(
+                        applications.getContent().stream().map(Application::getScholarshipId).distinct().toList())
+                .stream()
+                .collect(Collectors.toMap(Scholarship::getId, Function.identity()));
+        return applications.map(app -> toResponse(app, scholarships.get(app.getScholarshipId())));
+    }
+
+    public List<ApplicationResponse> getRecentByScholarshipIds(List<String> scholarshipIds, int limit) {
+        if (scholarshipIds == null || scholarshipIds.isEmpty()) {
+            return List.of();
+        }
+
+        Map<String, Scholarship> scholarships = scholarshipRepository.findAllById(scholarshipIds).stream()
+                .collect(Collectors.toMap(Scholarship::getId, Function.identity()));
+
+        return applicationRepository.findByScholarshipIdIn(scholarshipIds).stream()
+                .sorted((left, right) -> {
+                    LocalDateTime leftTime = left.getSubmittedAt() != null ? left.getSubmittedAt() : left.getCreatedAt();
+                    LocalDateTime rightTime = right.getSubmittedAt() != null ? right.getSubmittedAt() : right.getCreatedAt();
+                    if (leftTime == null && rightTime == null) return 0;
+                    if (leftTime == null) return 1;
+                    if (rightTime == null) return -1;
+                    return rightTime.compareTo(leftTime);
+                })
+                .limit(limit)
+                .map(app -> toResponse(app, scholarships.get(app.getScholarshipId())))
+                .toList();
     }
 
     // ── Update ─────────────────────────────────────────────────────────────────
@@ -183,6 +225,14 @@ public class ApplicationService {
     }
 
     public ApplicationResponse toResponse(Application app) {
-        return modelMapper.map(app, ApplicationResponse.class);
+        return toResponse(app, null);
+    }
+
+    public ApplicationResponse toResponse(Application app, Scholarship scholarship) {
+        ApplicationResponse response = modelMapper.map(app, ApplicationResponse.class);
+        if (scholarship != null) {
+            response.setScholarship(modelMapper.map(scholarship, com.scholarship.platform.dto.response.ScholarshipResponse.class));
+        }
+        return response;
     }
 }

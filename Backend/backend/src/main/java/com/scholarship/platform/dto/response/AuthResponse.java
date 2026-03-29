@@ -24,4 +24,5 @@ public class AuthResponse {
     private UserRole role;
     private boolean  verified;
     private int      profileCompletion;
+    private String   verificationUrl;
 }

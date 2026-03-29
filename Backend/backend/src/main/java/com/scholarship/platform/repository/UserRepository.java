@@ -15,6 +15,8 @@ public interface UserRepository extends MongoRepository<User, String> {
 
     Optional<User> findByEmailAndDeletedFalse(String email);
 
+    Optional<User> findByEmail(String email);
+
     boolean existsByEmail(String email);
 
     Optional<User> findByVerificationToken(String token);
@@ -22,6 +24,8 @@ public interface UserRepository extends MongoRepository<User, String> {
     Optional<User> findByPasswordResetToken(String token);
 
     Page<User> findAllByDeletedFalse(Pageable pageable);
+
+    java.util.List<User> findAllByDeletedFalse();
 
     Page<User> findByRoleAndDeletedFalse(UserRole role, Pageable pageable);
 

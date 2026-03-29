@@ -61,6 +61,10 @@ public class DocumentService {
                 .orElseThrow(() -> new ResourceNotFoundException("Document", "id", id));
     }
 
+    public List<Document> getByUser(String userId) {
+        return documentRepository.findByUserIdAndDeletedFalse(userId);
+    }
+
     public List<Document> getByApplication(String applicationId) {
         return documentRepository.findByApplicationIdAndDeletedFalse(applicationId);
     }
