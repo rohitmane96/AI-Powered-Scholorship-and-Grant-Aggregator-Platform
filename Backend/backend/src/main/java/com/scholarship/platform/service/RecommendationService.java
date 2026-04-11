@@ -18,6 +18,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.Locale;
 import java.util.stream.Collectors;
 
 /**
@@ -65,10 +66,40 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class RecommendationService {
 
+    private static final Map<String, String> COUNTRY_ALIASES = Map.ofEntries(
+            Map.entry("usa", "us"),
+            Map.entry("u.s.a", "us"),
+            Map.entry("u.s.", "us"),
+            Map.entry("united states", "us"),
+            Map.entry("united states of america", "us"),
+            Map.entry("america", "us"),
+            Map.entry("uk", "uk"),
+            Map.entry("u.k.", "uk"),
+            Map.entry("united kingdom", "uk"),
+            Map.entry("britain", "uk"),
+            Map.entry("great britain", "uk"),
+            Map.entry("england", "uk"),
+            Map.entry("india", "india")
+    );
+
+    private static final Map<String, String> FIELD_ALIASES = Map.ofEntries(
+            Map.entry("cs", "computer science"),
+            Map.entry("cse", "computer science"),
+            Map.entry("it", "information technology"),
+            Map.entry("ai", "artificial intelligence"),
+            Map.entry("ml", "machine learning"),
+            Map.entry("ece", "electronics and communication engineering"),
+            Map.entry("eee", "electrical and electronics engineering"),
+            Map.entry("mech", "mechanical engineering"),
+            Map.entry("civil", "civil engineering"),
+            Map.entry("entc", "electronics and telecommunication engineering")
+    );
+
     private final ScholarshipRepository  scholarshipRepository;
     private final ApplicationRepository  applicationRepository;
     private final ScholarshipService     scholarshipService;
     private final TfIdfEngine            tfidfEngine;
+    private final PythonRecommendationClient pythonRecommendationClient;
 
     // ── Public API ─────────────────────────────────────────────────────────────
 
@@ -110,6 +141,16 @@ public class RecommendationService {
         log.debug("Hybrid engine: {} candidates, {} applied, {} accepted/reviewed",
                 candidates.size(), appliedIds.size(), acceptedIds.size());
 
+        List<Scholarship> filteredCandidates = candidates.stream()
+                .filter(s -> !appliedIds.contains(s.getId()))
+                .toList();
+
+        Optional<List<ScholarshipResponse>> pythonResults = getPythonRecommendations(
+                user, filteredCandidates, acceptedScholarships, limit);
+        if (pythonResults.isPresent()) {
+            return pythonResults.get();
+        }
+
         // ── 3. Pre-compute corpus for TF-IDF (IDF over full pool) ────────────
         List<String> corpus = candidates.stream()
                 .map(this::buildScholarshipText)
@@ -123,14 +164,43 @@ public class RecommendationService {
                 .max().orElse(1.0);
 
         // ── 5. Score → filter → sort → cap ───────────────────────────────────
-        return candidates.stream()
-                .filter(s -> !appliedIds.contains(s.getId()))
+        return filteredCandidates.stream()
                 .map(s -> hybridScore(user, s, acceptedScholarships,
                                       userText, corpus, maxPopularity))
                 .filter(r -> r.getMatchScore() != null && r.getMatchScore() > 0)
                 .sorted(Comparator.comparingInt(ScholarshipResponse::getMatchScore).reversed())
                 .limit(limit)
                 .collect(Collectors.toList());
+    }
+
+    private Optional<List<ScholarshipResponse>> getPythonRecommendations(
+            User user,
+            List<Scholarship> filteredCandidates,
+            List<Scholarship> acceptedScholarships,
+            int limit) {
+
+        return pythonRecommendationClient
+                .getRecommendations(user, filteredCandidates, acceptedScholarships, limit)
+                .map(results -> {
+                    Map<String, Scholarship> scholarshipMap = filteredCandidates.stream()
+                            .collect(Collectors.toMap(Scholarship::getId, s -> s));
+
+                    return results.stream()
+                            .map(result -> {
+                                Scholarship scholarship = scholarshipMap.get(result.getScholarshipId());
+                                if (scholarship == null) {
+                                    return null;
+                                }
+                                ScholarshipResponse response = scholarshipService
+                                        .toResponse(scholarship, result.getScore());
+                                response.setScoreBreakdown(result.getScoreBreakdown());
+                                return response;
+                            })
+                            .filter(Objects::nonNull)
+                            .filter(response -> response.getMatchScore() != null && response.getMatchScore() > 0)
+                            .toList();
+                })
+                .filter(results -> !results.isEmpty());
     }
 
     /**
@@ -184,6 +254,14 @@ public class RecommendationService {
                 Constants.REC_WEIGHT_POPULARITY * popularityScore);
         finalScore = Math.min(finalScore, Constants.MATCH_MAX_SCORE);
 
+        // Preserve strong rule-based fit when the text corpus is sparse
+        // and popularity is unavailable for newly ingested scholarships.
+        if (ruleScore >= 70 && popularityScore == 0) {
+            finalScore = Math.max(finalScore, ruleScore);
+        } else if (ruleScore >= 60 && nlpScore < 35 && popularityScore == 0) {
+            finalScore = Math.max(finalScore, Math.min(85, (int) Math.round(ruleScore * 0.85)));
+        }
+
         // ── Full breakdown for UI explainability ──────────────────────────────
         Map<String, Integer> breakdown = new LinkedHashMap<>(rules);
         breakdown.put("nlpSimilarity",   nlpScore);
@@ -208,7 +286,10 @@ public class RecommendationService {
         // 1. Country match (20 pts)
         if (user.getPreferences() != null
                 && !user.getPreferences().getTargetCountries().isEmpty()
-                && user.getPreferences().getTargetCountries().contains(scholarship.getCountry())) {
+                && user.getPreferences().getTargetCountries().stream()
+                .filter(Objects::nonNull)
+                .map(this::normalizeCountry)
+                .anyMatch(country -> country.equals(normalizeCountry(scholarship.getCountry())))) {
             breakdown.put("country", Constants.MATCH_COUNTRY);
         }
 
@@ -222,17 +303,16 @@ public class RecommendationService {
         }
 
         // 3. Field of study – exact (20 pts) or partial keyword (10 pts)
-        if (user.getEducation() != null
-                && user.getEducation().getFieldOfStudy() != null
-                && scholarship.getFieldOfStudy() != null) {
+        Set<String> userFields = collectUserFields(user);
+        if (!userFields.isEmpty() && scholarship.getFieldOfStudy() != null) {
+            String schField = normalizeField(scholarship.getFieldOfStudy());
 
-            String userField = user.getEducation().getFieldOfStudy().toLowerCase();
-            String schField  = scholarship.getFieldOfStudy().toLowerCase();
-
-            if (schField.equalsIgnoreCase("any") || schField.equals(userField)) {
+            if ("any".equals(schField) || userFields.contains(schField)) {
                 breakdown.put("fieldOfStudy", Constants.MATCH_FIELD_EXACT);
-            } else if (schField.contains(userField) || userField.contains(schField)
-                       || keywordOverlap(userField, schField)) {
+            } else if (userFields.stream().anyMatch(userField ->
+                    schField.contains(userField)
+                    || userField.contains(schField)
+                    || keywordOverlap(userField, schField))) {
                 breakdown.put("fieldOfStudy", Constants.MATCH_FIELD_PARTIAL);
             }
         }
@@ -258,11 +338,11 @@ public class RecommendationService {
                 && scholarship.getTags() != null
                 && !scholarship.getTags().isEmpty()) {
 
-            String userField = user.getEducation().getFieldOfStudy().toLowerCase();
             boolean tagHit = scholarship.getTags().stream()
-                    .anyMatch(tag -> tag != null &&
-                              (tag.toLowerCase().contains(userField)
-                               || userField.contains(tag.toLowerCase())));
+                    .filter(Objects::nonNull)
+                    .map(this::normalizeField)
+                    .anyMatch(tag -> collectUserFields(user).stream().anyMatch(userField ->
+                            tag.contains(userField) || userField.contains(tag)));
             if (tagHit) breakdown.put("tagMatch", Constants.MATCH_TAG);
         }
 
@@ -312,15 +392,22 @@ public class RecommendationService {
         List<String> parts = new ArrayList<>();
         if (user.getEducation() != null) {
             if (user.getEducation().getFieldOfStudy() != null)
-                parts.add(user.getEducation().getFieldOfStudy());
+                parts.add(normalizeField(user.getEducation().getFieldOfStudy()));
             if (user.getEducation().getLevel() != null)
                 parts.add(user.getEducation().getLevel().name().replace('_', ' '));
         }
         if (user.getPreferences() != null) {
-            parts.addAll(user.getPreferences().getTargetCountries());
+            user.getPreferences().getTargetCountries().stream()
+                    .filter(Objects::nonNull)
+                    .map(this::normalizeCountry)
+                    .forEach(parts::add);
             user.getPreferences().getFundingTypes().stream()
                     .map(FundingType::name)
                     .map(n -> n.replace('_', ' '))
+                    .forEach(parts::add);
+            user.getPreferences().getFieldsOfStudy().stream()
+                    .filter(Objects::nonNull)
+                    .map(this::normalizeField)
                     .forEach(parts::add);
         }
         return String.join(" ", parts);
@@ -348,7 +435,45 @@ public class RecommendationService {
      */
     private boolean fieldRelated(String a, String b) {
         if (a == null || b == null) return false;
-        String la = a.toLowerCase(), lb = b.toLowerCase();
+        String la = normalizeField(a), lb = normalizeField(b);
         return la.equals(lb) || la.contains(lb) || lb.contains(la) || keywordOverlap(la, lb);
+    }
+
+    private Set<String> collectUserFields(User user) {
+        Set<String> fields = new LinkedHashSet<>();
+        if (user.getEducation() != null && user.getEducation().getFieldOfStudy() != null) {
+            fields.add(normalizeField(user.getEducation().getFieldOfStudy()));
+        }
+        if (user.getPreferences() != null && user.getPreferences().getFieldsOfStudy() != null) {
+            user.getPreferences().getFieldsOfStudy().stream()
+                    .filter(Objects::nonNull)
+                    .map(this::normalizeField)
+                    .forEach(fields::add);
+        }
+        fields.removeIf(String::isBlank);
+        return fields;
+    }
+
+    private String normalizeCountry(String value) {
+        if (value == null) {
+            return "";
+        }
+        String normalized = value.trim().toLowerCase(Locale.ROOT).replaceAll("[^a-z\\s]", " ");
+        normalized = normalized.replaceAll("\\s+", " ").trim();
+        return COUNTRY_ALIASES.getOrDefault(normalized, normalized);
+    }
+
+    private String normalizeField(String value) {
+        if (value == null) {
+            return "";
+        }
+        String normalized = value.trim().toLowerCase(Locale.ROOT).replace('&', ' ');
+        normalized = normalized.replaceAll("[^a-z\\s]", " ");
+        normalized = normalized.replaceAll("\\s+", " ").trim();
+        String aliasExpanded = Arrays.stream(normalized.split("\\s+"))
+                .map(token -> FIELD_ALIASES.getOrDefault(token, token))
+                .collect(Collectors.joining(" "))
+                .trim();
+        return aliasExpanded.isBlank() ? normalized : aliasExpanded;
     }
 }

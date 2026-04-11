@@ -4,6 +4,7 @@ import com.scholarship.platform.dto.request.ScholarshipRequest;
 import com.scholarship.platform.dto.response.ApiResponse;
 import com.scholarship.platform.dto.response.PageResponse;
 import com.scholarship.platform.dto.response.ScholarshipResponse;
+import com.scholarship.platform.exception.UnauthorizedException;
 import com.scholarship.platform.model.User;
 import com.scholarship.platform.model.enums.DegreeLevel;
 import com.scholarship.platform.model.enums.FundingType;
@@ -65,9 +66,14 @@ public class ScholarshipController {
     @Operation(summary = "Get AI-powered scholarship recommendations for the current user")
     @GetMapping("/recommendations")
     @SecurityRequirement(name = "bearerAuth")
+    @PreAuthorize("hasRole('STUDENT')")
     public ResponseEntity<ApiResponse<List<ScholarshipResponse>>> getRecommendations(
             @AuthenticationPrincipal UserDetails principal,
             @RequestParam(defaultValue = "10") int limit) {
+
+        if (principal == null) {
+            throw new UnauthorizedException("Authentication is required to fetch recommendations.");
+        }
 
         User user = userService.getByEmail(principal.getUsername());
         List<ScholarshipResponse> recs = recommendationService.getRecommendations(user, limit);

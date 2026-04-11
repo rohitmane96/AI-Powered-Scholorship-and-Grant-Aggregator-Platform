@@ -83,8 +83,14 @@ public class SecurityConfig {
             .exceptionHandling(ex ->
                     ex.authenticationEntryPoint(authEntryPoint))
             .authorizeHttpRequests(auth -> auth
-                    // Public GET on scholarships
-                    .requestMatchers(HttpMethod.GET, "/api/scholarships/**").permitAll()
+                    // Authenticated recommendation endpoint
+                    .requestMatchers(HttpMethod.GET, "/api/scholarships/recommendations").authenticated()
+                    // Public GET on scholarship discovery endpoints
+                    .requestMatchers(HttpMethod.GET, "/api/scholarships").permitAll()
+                    .requestMatchers(HttpMethod.GET, "/api/scholarships/search").permitAll()
+                    .requestMatchers(HttpMethod.GET, "/api/scholarships/featured").permitAll()
+                    .requestMatchers(HttpMethod.GET, "/api/scholarships/*").permitAll()
+                    .requestMatchers(HttpMethod.GET, "/api/scholarships/*/similar").permitAll()
                     // All auth endpoints
                     .requestMatchers(PUBLIC_ENDPOINTS).permitAll()
                     // Everything else requires authentication

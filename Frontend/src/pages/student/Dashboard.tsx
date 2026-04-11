@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
+import { useEffect } from 'react'
 import { motion } from 'framer-motion'
 import {
   FileText,
@@ -17,6 +18,7 @@ import { useAuthStore } from '@/store/authStore'
 import { dashboardApi } from '@/api/dashboard'
 import { recommendationsApi } from '@/api/recommendations'
 import { applicationsApi } from '@/api/applications'
+import { profileApi } from '@/api/profile'
 import { StatsCard } from '@/components/common/StatsCard'
 import { ScholarshipCard } from '@/components/common/ScholarshipCard'
 import { ApplicationStatusBadge } from '@/components/common/ApplicationStatus'
@@ -29,8 +31,13 @@ import { EmptyState } from '@/components/common/EmptyState'
 import { formatDate, formatCurrency, truncate } from '@/lib/utils'
 
 export default function StudentDashboard() {
-  const { user } = useAuthStore()
+  const { user, updateUser } = useAuthStore()
   const navigate = useNavigate()
+
+  const { data: profile } = useQuery({
+    queryKey: ['profile'],
+    queryFn: profileApi.getProfile,
+  })
 
   const { data: myStats, isLoading: statsLoading } = useQuery({
     queryKey: ['dashboard', 'my-stats'],
@@ -48,6 +55,14 @@ export default function StudentDashboard() {
   })
 
   const applications = applicationsPage?.content ?? []
+  const displayUser = profile ?? user
+  const needsProfileCompletion = (displayUser?.profileCompletion ?? 0) < 100
+
+  useEffect(() => {
+    if (profile) {
+      updateUser(profile)
+    }
+  }, [profile, updateUser])
 
   const upcomingDeadlines = applications
     .filter(a => {
@@ -76,20 +91,20 @@ export default function StudentDashboard() {
               You have {myStats?.pending ?? 0} applications under review. Keep pushing!
             </p>
 
-            {user && (
+            {displayUser && (
               <div className="mt-4 max-w-xs">
                 <div className="flex items-center justify-between mb-1.5">
                   <span className="text-xs text-slate-400">Profile Completion</span>
                   <span className="text-xs font-semibold text-indigo-300">
-                    {user.profileCompletion ?? 0}%
+                    {displayUser.profileCompletion ?? 0}%
                   </span>
                 </div>
                 <Progress
-                  value={user.profileCompletion ?? 0}
+                  value={displayUser.profileCompletion ?? 0}
                   size="sm"
                   color="gradient"
                 />
-                {(user.profileCompletion ?? 0) < 100 && (
+                {needsProfileCompletion && (
                   <p className="text-xs text-slate-500 mt-1.5">
                     Complete your profile to get better AI matches
                   </p>
@@ -181,8 +196,12 @@ export default function StudentDashboard() {
           <EmptyState
             icon="✨"
             title="No recommendations yet"
-            description="Complete your profile to get personalized AI scholarship recommendations."
-            action={{ label: 'Complete Profile', onClick: () => navigate('/profile') }}
+            description={needsProfileCompletion
+              ? 'Complete your profile to get personalized AI scholarship recommendations.'
+              : 'Your profile is complete, but there are no AI recommendations available right now.'}
+            action={needsProfileCompletion
+              ? { label: 'Complete Profile', onClick: () => navigate('/profile') }
+              : { label: 'Browse Scholarships', onClick: () => navigate('/scholarships') }}
           />
         )}
       </div>

@@ -71,7 +71,7 @@ class AuthServiceTest {
     @Test
     @DisplayName("register – new user is saved and tokens are returned")
     void register_newUser_success() {
-        when(userRepository.existsByEmail("alice@example.com")).thenReturn(false);
+        when(userRepository.findByEmail("alice@example.com")).thenReturn(Optional.empty());
         when(passwordEncoder.encode(any())).thenReturn("encodedPassword");
         when(userRepository.save(any(User.class))).thenReturn(sampleUser);
         when(tokenProvider.generateAccessToken("alice@example.com")).thenReturn("access-token");
@@ -95,7 +95,7 @@ class AuthServiceTest {
     @Test
     @DisplayName("register – duplicate email throws BadRequestException")
     void register_duplicateEmail_throws() {
-        when(userRepository.existsByEmail("alice@example.com")).thenReturn(true);
+        when(userRepository.findByEmail("alice@example.com")).thenReturn(Optional.of(sampleUser));
 
         assertThatThrownBy(() -> authService.register(validRegisterRequest))
                 .isInstanceOf(BadRequestException.class)

@@ -5,7 +5,7 @@ import { mapRecommendationResponse } from './mappers'
 export const recommendationsApi = {
   getRecommendations: async (limit = 10): Promise<Recommendation[]> => {
     const res = await api.get(`/api/scholarships/recommendations?limit=${limit}`)
-    const payload = Array.isArray(res.data?.data) ? res.data.data : []
+    const payload = Array.isArray(res.data) ? res.data : []
     return payload.map(mapRecommendationResponse)
   },
 }

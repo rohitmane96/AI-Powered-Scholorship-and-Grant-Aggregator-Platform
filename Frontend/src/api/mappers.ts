@@ -172,8 +172,8 @@ export function mapRecommendationResponse(payload: any): Recommendation {
     fieldOfStudy: toNumber(breakdown?.fieldOfStudy),
     gpaScore: toNumber(breakdown?.gpa),
     fundingType: toNumber(breakdown?.fundingType),
-    nlpSimilarity: toNumber(breakdown?.tagMatch),
-    popularity: toNumber(breakdown?.historyBoost),
+    nlpSimilarity: toNumber(breakdown?.nlpSimilarity),
+    popularity: toNumber(breakdown?.popularityScore),
   }
 
   return {

@@ -38,6 +38,7 @@ class RecommendationServiceTest {
     @Mock  ScholarshipRepository scholarshipRepository;
     @Mock  ApplicationRepository applicationRepository;
     @Mock  ScholarshipService    scholarshipService;
+    @Mock  PythonRecommendationClient pythonRecommendationClient;
     @Spy   TfIdfEngine           tfidfEngine = new TfIdfEngine();
 
     @InjectMocks RecommendationService recommendationService;
@@ -127,6 +128,46 @@ class RecommendationServiceTest {
     }
 
     @Test
+    @DisplayName("Country aliases match: USA user preference matches US scholarship")
+    void calculateScore_countryAliasMatch() {
+        User user = buildUser("USA", DegreeLevel.UNDERGRADUATE, "CS", 3.6, FundingType.FULL_FUNDING);
+        Scholarship sch = buildScholarship("US", DegreeLevel.UNDERGRADUATE, "CS", FundingType.FULL_FUNDING);
+
+        assertThat(recommendationService.calculateScore(user, sch)).isEqualTo(90);
+    }
+
+    @Test
+    @DisplayName("Field aliases match: cs preference matches computer science scholarship")
+    void calculateScore_fieldAliasMatch() {
+        User user = buildUser("US", DegreeLevel.UNDERGRADUATE, "cs", 3.6, FundingType.FULL_FUNDING);
+        Scholarship sch = buildScholarship("US", DegreeLevel.UNDERGRADUATE, "computer science", FundingType.FULL_FUNDING);
+
+        assertThat(recommendationService.calculateScore(user, sch)).isEqualTo(90);
+    }
+
+    @Test
+    @DisplayName("Preference fields of study contribute to matching even when education field differs")
+    void calculateScore_preferenceFieldsAreUsed() {
+        User user = User.builder()
+                .id("u1")
+                .education(User.Education.builder()
+                        .level(DegreeLevel.UNDERGRADUATE)
+                        .fieldOfStudy("Electronics")
+                        .currentGPA(3.7)
+                        .build())
+                .preferences(User.Preferences.builder()
+                        .targetCountries(List.of("US"))
+                        .fundingTypes(List.of(FundingType.FULL_FUNDING))
+                        .fieldsOfStudy(List.of("computer science"))
+                        .build())
+                .build();
+
+        Scholarship sch = buildScholarship("US", DegreeLevel.UNDERGRADUATE, "CS", FundingType.FULL_FUNDING);
+
+        assertThat(recommendationService.calculateScore(user, sch)).isEqualTo(90);
+    }
+
+    @Test
     @DisplayName("Deadline urgency adds 5 pts when deadline within 30 days")
     void calculateScore_deadlineUrgency() {
         Scholarship urgent = Scholarship.builder()
@@ -184,6 +225,8 @@ class RecommendationServiceTest {
         when(scholarshipRepository.findByDeadlineAfterAndDeletedFalseAndActiveTrue(
                 any(LocalDateTime.class), any()))
                 .thenReturn(new PageImpl<>(List.of(applied, available)));
+        when(pythonRecommendationClient.getRecommendations(any(), anyList(), anyList(), anyInt()))
+                .thenReturn(java.util.Optional.empty());
         when(scholarshipService.toResponse(eq(available), anyInt()))
                 .thenReturn(ScholarshipResponse.builder().id("available-1").matchScore(70).build());
 
@@ -203,7 +246,73 @@ class RecommendationServiceTest {
         when(scholarshipRepository.findByDeadlineAfterAndDeletedFalseAndActiveTrue(
                 any(LocalDateTime.class), any()))
                 .thenReturn(new PageImpl<>(Collections.emptyList()));
+        when(pythonRecommendationClient.getRecommendations(any(), anyList(), anyList(), anyInt()))
+                .thenReturn(java.util.Optional.empty());
 
         assertThat(recommendationService.getRecommendations(user, 10)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("Strong rule matches retain useful recommendation scores when NLP and popularity are sparse")
+    void getRecommendations_preservesStrongRuleBasedMatches() {
+        User user = buildUser("USA", DegreeLevel.UNDERGRADUATE, "cs", 3.8, FundingType.FULL_FUNDING);
+
+        Scholarship sch = Scholarship.builder()
+                .id("s-strong")
+                .name("US Merit Scholarship")
+                .country("US")
+                .degreeLevel(DegreeLevel.UNDERGRADUATE)
+                .fieldOfStudy("computer science")
+                .fundingType(FundingType.FULL_FUNDING)
+                .deadline(LocalDateTime.now().plusMonths(2))
+                .viewCount(0)
+                .applicationCount(0)
+                .active(true)
+                .deleted(false)
+                .build();
+
+        when(applicationRepository.findByUserId("u1")).thenReturn(Collections.emptyList());
+        when(scholarshipRepository.findByDeadlineAfterAndDeletedFalseAndActiveTrue(
+                any(LocalDateTime.class), any()))
+                .thenReturn(new PageImpl<>(List.of(sch)));
+        when(pythonRecommendationClient.getRecommendations(any(), anyList(), anyList(), anyInt()))
+                .thenReturn(java.util.Optional.empty());
+        when(scholarshipService.toResponse(eq(sch), anyInt()))
+                .thenAnswer(invocation -> ScholarshipResponse.builder()
+                        .id("s-strong")
+                        .matchScore(invocation.getArgument(1))
+                        .build());
+
+        List<ScholarshipResponse> results = recommendationService.getRecommendations(user, 10);
+
+        assertThat(results).hasSize(1);
+        assertThat(results.get(0).getMatchScore()).isGreaterThanOrEqualTo(75);
+    }
+
+    @Test
+    @DisplayName("getRecommendations prefers Python recommender results when available")
+    void getRecommendations_usesPythonServiceWhenAvailable() {
+        User user = buildUser("US", DegreeLevel.UNDERGRADUATE, "CS", 3.8, FundingType.FULL_FUNDING);
+        Scholarship sch = buildScholarship("US", DegreeLevel.UNDERGRADUATE, "computer science", FundingType.FULL_FUNDING);
+        sch.setId("py-1");
+
+        when(applicationRepository.findByUserId("u1")).thenReturn(Collections.emptyList());
+        when(scholarshipRepository.findByDeadlineAfterAndDeletedFalseAndActiveTrue(
+                any(LocalDateTime.class), any()))
+                .thenReturn(new PageImpl<>(List.of(sch)));
+        when(pythonRecommendationClient.getRecommendations(any(), anyList(), anyList(), anyInt()))
+                .thenReturn(java.util.Optional.of(List.of(
+                        new PythonRecommendationClient.PythonRecommendation(
+                                "py-1", 88, java.util.Map.of("country", 20, "nlpSimilarity", 68)
+                        ))));
+        when(scholarshipService.toResponse(eq(sch), eq(88)))
+                .thenReturn(ScholarshipResponse.builder().id("py-1").matchScore(88).build());
+
+        List<ScholarshipResponse> results = recommendationService.getRecommendations(user, 5);
+
+        assertThat(results).hasSize(1);
+        assertThat(results.get(0).getId()).isEqualTo("py-1");
+        assertThat(results.get(0).getMatchScore()).isEqualTo(88);
+        assertThat(results.get(0).getScoreBreakdown()).containsEntry("country", 20);
     }
 }

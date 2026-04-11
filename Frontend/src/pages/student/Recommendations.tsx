@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
 import { Sparkles, RefreshCw } from 'lucide-react'
 import { recommendationsApi } from '@/api/recommendations'
+import { profileApi } from '@/api/profile'
 import { ScholarshipCard } from '@/components/common/ScholarshipCard'
 import { ScoreBreakdown } from '@/components/common/ScoreBreakdown'
 import { EmptyState } from '@/components/common/EmptyState'
@@ -9,16 +10,32 @@ import { SkeletonCard } from '@/components/ui/Spinner'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
 import { useNavigate } from 'react-router-dom'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useAuthStore } from '@/store/authStore'
 
 export default function Recommendations() {
   const navigate = useNavigate()
+  const { user, updateUser } = useAuthStore()
   const [limit, setLimit] = useState(10)
+
+  const { data: profile } = useQuery({
+    queryKey: ['profile'],
+    queryFn: profileApi.getProfile,
+  })
 
   const { data: recommendations, isLoading, refetch, isFetching } = useQuery({
     queryKey: ['recommendations', limit],
     queryFn: () => recommendationsApi.getRecommendations(limit),
   })
+
+  useEffect(() => {
+    if (profile) {
+      updateUser(profile)
+    }
+  }, [profile, updateUser])
+
+  const profileCompletion = profile?.profileCompletion ?? user?.profileCompletion ?? 0
+  const needsProfileCompletion = profileCompletion < 100
 
   return (
     <div className="space-y-6">
@@ -72,8 +89,12 @@ export default function Recommendations() {
         <EmptyState
           icon="✨"
           title="No recommendations yet"
-          description="Complete your profile including education details and preferences to unlock AI-powered matches."
-          action={{ label: 'Complete Profile', onClick: () => navigate('/profile') }}
+          description={needsProfileCompletion
+            ? 'Complete your profile including education details and preferences to unlock AI-powered matches.'
+            : 'Your profile is complete, but there are no strong AI matches right now. Refresh later or explore all scholarships.'}
+          action={needsProfileCompletion
+            ? { label: 'Complete Profile', onClick: () => navigate('/profile') }
+            : { label: 'Browse Scholarships', onClick: () => navigate('/scholarships') }}
         />
       ) : (
         <>

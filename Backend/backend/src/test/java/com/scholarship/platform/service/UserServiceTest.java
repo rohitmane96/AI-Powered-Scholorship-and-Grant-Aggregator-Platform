@@ -166,14 +166,13 @@ class UserServiceTest {
     // ── Delete ─────────────────────────────────────────────────────────────────
 
     @Test
-    @DisplayName("deleteUser – soft-deletes the user")
-    void deleteUser_softDeletes() {
+    @DisplayName("deleteUser – hard-deletes the user")
+    void deleteUser_hardDeletes() {
         when(userRepository.findById("student-1")).thenReturn(Optional.of(sampleStudent));
-        when(userRepository.save(any())).thenReturn(sampleStudent);
 
         userService.deleteUser("student-1");
 
-        verify(userRepository).save(argThat(User::isDeleted));
+        verify(userRepository).delete(sampleStudent);
     }
 
     // ── Stats ──────────────────────────────────────────────────────────────────
