@@ -33,6 +33,9 @@ public class EmailService {
     @Value("${spring.mail.username}")
     private String fromEmail;
 
+    @Value("${spring.mail.password:}")
+    private String mailPassword;
+
     @Value("${app.frontend-url:http://localhost:5173}")
     private String frontendUrl;
 
@@ -40,10 +43,16 @@ public class EmailService {
 
     @Async
     public void sendVerificationEmail(User user) {
+        sendVerificationEmail(user, null);
+    }
+
+    @Async
+    public void sendVerificationEmail(User user, String frontendBaseUrl) {
         Context ctx = new Context();
         ctx.setVariable("name",  user.getFullName());
         ctx.setVariable("token", user.getVerificationToken());
-        ctx.setVariable("verifyUrl", frontendUrl + "/verify-email?token=" + user.getVerificationToken());
+        ctx.setVariable("verifyUrl", resolveFrontendUrl(frontendBaseUrl)
+                + "/verify-email?token=" + user.getVerificationToken());
 
         sendHtmlEmail(user.getEmail(), "Verify your ScholarMatch AI account",
                       Constants.EMAIL_TEMPLATE_VERIFY, ctx);
@@ -51,9 +60,14 @@ public class EmailService {
 
     @Async
     public void sendPasswordResetEmail(User user, String token) {
+        sendPasswordResetEmail(user, token, null);
+    }
+
+    @Async
+    public void sendPasswordResetEmail(User user, String token, String frontendBaseUrl) {
         Context ctx = new Context();
         ctx.setVariable("name",     user.getFullName());
-        ctx.setVariable("resetUrl", frontendUrl + "/reset-password?token=" + token);
+        ctx.setVariable("resetUrl", resolveFrontendUrl(frontendBaseUrl) + "/reset-password?token=" + token);
 
         sendHtmlEmail(user.getEmail(), "Reset your ScholarMatch AI password",
                       Constants.EMAIL_TEMPLATE_RESET_PWD, ctx);
@@ -90,6 +104,13 @@ public class EmailService {
 
     private void sendHtmlEmail(String to, String subject, String templateName, Context ctx) {
         try {
+            if (!isMailConfigured()) {
+                log.warn("SMTP not configured with real credentials. Skipping send for {} subject='{}'",
+                        to, subject);
+                logFallbackDetails(subject, to, ctx);
+                return;
+            }
+
             String html = templateEngine.process(templateName, ctx);
 
             MimeMessage message = mailSender.createMimeMessage();
@@ -109,6 +130,26 @@ public class EmailService {
             log.error("Failed to send email to {}: {}", to, ex.getMessage());
             logFallbackDetails(subject, to, ctx);
         }
+    }
+
+    private boolean isMailConfigured() {
+        if (fromEmail == null || fromEmail.isBlank() || mailPassword == null || mailPassword.isBlank()) {
+            return false;
+        }
+
+        return !("noreply@scholarmatch.ai".equalsIgnoreCase(fromEmail.trim())
+                && "changeme".equals(mailPassword));
+    }
+
+    private String resolveFrontendUrl(String frontendBaseUrl) {
+        String candidate = frontendBaseUrl;
+        if (candidate == null || candidate.isBlank()) {
+            candidate = frontendUrl;
+        }
+        if (candidate == null || candidate.isBlank()) {
+            candidate = "http://localhost:5173";
+        }
+        return candidate.endsWith("/") ? candidate.substring(0, candidate.length() - 1) : candidate;
     }
 
     private void logFallbackDetails(String subject, String to, Context ctx) {

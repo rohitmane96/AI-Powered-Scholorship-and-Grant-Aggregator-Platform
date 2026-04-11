@@ -77,7 +77,7 @@ class AuthServiceTest {
         when(tokenProvider.generateAccessToken("alice@example.com")).thenReturn("access-token");
         when(tokenProvider.generateRefreshToken("alice@example.com")).thenReturn("refresh-token");
         when(tokenProvider.getJwtExpirationMs()).thenReturn(86400000L);
-        doNothing().when(emailService).sendVerificationEmail(any());
+        doNothing().when(emailService).sendVerificationEmail(any(), any());
         doNothing().when(notificationService).sendWelcomeNotification(any());
 
         AuthResponse response = authService.register(validRegisterRequest);
@@ -88,7 +88,7 @@ class AuthServiceTest {
         assertThat(response.getRole()).isEqualTo(UserRole.STUDENT);
 
         verify(userRepository).save(any(User.class));
-        verify(emailService).sendVerificationEmail(any(User.class));
+        verify(emailService).sendVerificationEmail(any(User.class), isNull());
         verify(notificationService).sendWelcomeNotification(any(User.class));
     }
 
@@ -203,12 +203,12 @@ class AuthServiceTest {
         when(userRepository.findByEmailAndDeletedFalse("alice@example.com"))
                 .thenReturn(Optional.of(sampleUser));
         when(userRepository.save(any())).thenReturn(sampleUser);
-        doNothing().when(emailService).sendPasswordResetEmail(any(), anyString());
+        doNothing().when(emailService).sendPasswordResetEmail(any(), anyString(), any());
 
         assertThatCode(() -> authService.forgotPassword("alice@example.com"))
                 .doesNotThrowAnyException();
 
-        verify(emailService).sendPasswordResetEmail(any(), anyString());
+        verify(emailService).sendPasswordResetEmail(any(), anyString(), isNull());
     }
 
     @Test

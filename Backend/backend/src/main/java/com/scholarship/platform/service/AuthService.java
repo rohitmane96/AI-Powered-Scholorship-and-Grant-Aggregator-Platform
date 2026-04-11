@@ -42,6 +42,10 @@ public class AuthService {
     // ── Registration ───────────────────────────────────────────────────────────
 
     public AuthResponse register(RegisterRequest request) {
+        return register(request, null);
+    }
+
+    public AuthResponse register(RegisterRequest request, String frontendBaseUrl) {
         String normalizedEmail = request.getEmail().toLowerCase().trim();
 
         userRepository.findByEmail(normalizedEmail).ifPresent(existing -> {
@@ -68,7 +72,7 @@ public class AuthService {
         user = userRepository.save(user);
 
         // Send verification email asynchronously
-        emailService.sendVerificationEmail(user);
+        emailService.sendVerificationEmail(user, frontendBaseUrl);
         notificationService.sendWelcomeNotification(user);
 
         log.info("New user registered: {} ({})", user.getEmail(), user.getRole());
@@ -76,7 +80,7 @@ public class AuthService {
         String accessToken  = tokenProvider.generateAccessToken(user.getEmail());
         String refreshToken = tokenProvider.generateRefreshToken(user.getEmail());
 
-        return buildAuthResponse(user, accessToken, refreshToken);
+        return buildAuthResponse(user, accessToken, refreshToken, frontendBaseUrl);
     }
 
     // ── Login ──────────────────────────────────────────────────────────────────
@@ -99,7 +103,7 @@ public class AuthService {
         String refreshToken = tokenProvider.generateRefreshToken(user.getEmail());
 
         log.info("User logged in: {}", user.getEmail());
-        return buildAuthResponse(user, accessToken, refreshToken);
+        return buildAuthResponse(user, accessToken, refreshToken, null);
     }
 
     // ── Token refresh ──────────────────────────────────────────────────────────
@@ -115,7 +119,7 @@ public class AuthService {
 
         String newAccess  = tokenProvider.generateAccessToken(email);
         String newRefresh = tokenProvider.generateRefreshToken(email);
-        return buildAuthResponse(user, newAccess, newRefresh);
+        return buildAuthResponse(user, newAccess, newRefresh, null);
     }
 
     // ── Email verification ─────────────────────────────────────────────────────
@@ -134,13 +138,17 @@ public class AuthService {
     // ── Password reset ─────────────────────────────────────────────────────────
 
     public void forgotPassword(String email) {
+        forgotPassword(email, null);
+    }
+
+    public void forgotPassword(String email, String frontendBaseUrl) {
         userRepository.findByEmailAndDeletedFalse(email.toLowerCase().trim())
                 .ifPresent(user -> {
                     String token = UUID.randomUUID().toString();
                     user.setPasswordResetToken(token);
                     user.setPasswordResetExpiry(LocalDateTime.now().plusHours(2));
                     userRepository.save(user);
-                    emailService.sendPasswordResetEmail(user, token);
+                    emailService.sendPasswordResetEmail(user, token, frontendBaseUrl);
                 });
         // Always return success to prevent email enumeration
     }
@@ -164,7 +172,8 @@ public class AuthService {
 
     // ── Helper ─────────────────────────────────────────────────────────────────
 
-    private AuthResponse buildAuthResponse(User user, String accessToken, String refreshToken) {
+    private AuthResponse buildAuthResponse(User user, String accessToken, String refreshToken,
+                                           String frontendBaseUrl) {
         return AuthResponse.builder()
                 .accessToken(accessToken)
                 .refreshToken(refreshToken)
@@ -177,7 +186,18 @@ public class AuthService {
                 .profileCompletion(user.getProfileCompletion())
                 .verificationUrl(user.getVerificationToken() == null
                         ? null
-                        : frontendUrl + "/verify-email?token=" + user.getVerificationToken())
+                        : resolveFrontendUrl(frontendBaseUrl) + "/verify-email?token=" + user.getVerificationToken())
                 .build();
+    }
+
+    private String resolveFrontendUrl(String frontendBaseUrl) {
+        String candidate = frontendBaseUrl;
+        if (candidate == null || candidate.isBlank()) {
+            candidate = frontendUrl;
+        }
+        if (candidate == null || candidate.isBlank()) {
+            candidate = "http://localhost:5173";
+        }
+        return candidate.endsWith("/") ? candidate.substring(0, candidate.length() - 1) : candidate;
     }
 }

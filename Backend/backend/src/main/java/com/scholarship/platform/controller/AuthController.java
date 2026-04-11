@@ -8,10 +8,12 @@ import com.scholarship.platform.service.AuthService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
 
+import java.net.URI;
 import java.util.Map;
 
 /**
@@ -29,9 +31,10 @@ public class AuthController {
     @Operation(summary = "Register a new user account")
     @PostMapping("/register")
     public ResponseEntity<ApiResponse<AuthResponse>> register(
-            @Valid @RequestBody RegisterRequest request) {
+            @Valid @RequestBody RegisterRequest request,
+            HttpServletRequest httpRequest) {
 
-        AuthResponse response = authService.register(request);
+        AuthResponse response = authService.register(request, resolveFrontendUrl(httpRequest));
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.ok("Account created successfully. Please verify your email.", response));
     }
@@ -78,9 +81,10 @@ public class AuthController {
     @Operation(summary = "Request a password-reset email")
     @PostMapping("/forgot-password")
     public ResponseEntity<ApiResponse<Void>> forgotPassword(
-            @RequestBody Map<String, String> body) {
+            @RequestBody Map<String, String> body,
+            HttpServletRequest httpRequest) {
 
-        authService.forgotPassword(body.get("email"));
+        authService.forgotPassword(body.get("email"), resolveFrontendUrl(httpRequest));
         return ResponseEntity.ok(ApiResponse.ok(
                 "If that email is registered, a reset link has been sent."));
     }
@@ -92,5 +96,33 @@ public class AuthController {
 
         authService.resetPassword(body.get("token"), body.get("newPassword"));
         return ResponseEntity.ok(ApiResponse.ok("Password reset successfully. Please log in."));
+    }
+
+    private String resolveFrontendUrl(HttpServletRequest request) {
+        String origin = request.getHeader("Origin");
+        if (origin != null && !origin.isBlank() && !"null".equalsIgnoreCase(origin)) {
+            return trimTrailingSlash(origin);
+        }
+
+        String referer = request.getHeader("Referer");
+        if (referer != null && !referer.isBlank()) {
+            try {
+                URI uri = URI.create(referer);
+                if (uri.getScheme() != null && uri.getHost() != null) {
+                    String authority = uri.getPort() > 0
+                            ? uri.getScheme() + "://" + uri.getHost() + ":" + uri.getPort()
+                            : uri.getScheme() + "://" + uri.getHost();
+                    return trimTrailingSlash(authority);
+                }
+            } catch (IllegalArgumentException ignored) {
+                // Fall back to configured frontend URL inside the service.
+            }
+        }
+
+        return null;
+    }
+
+    private String trimTrailingSlash(String value) {
+        return value.endsWith("/") ? value.substring(0, value.length() - 1) : value;
     }
 }

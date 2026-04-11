@@ -13,6 +13,7 @@ import { PublicLayout } from '@/components/layout/PublicLayout'
 import Landing from '@/pages/Landing'
 import Login from '@/pages/auth/Login'
 import Register from '@/pages/auth/Register'
+import VerifyEmail from '@/pages/auth/VerifyEmail'
 
 // Student pages
 import StudentDashboard from '@/pages/student/Dashboard'
@@ -93,6 +94,7 @@ export default function App() {
             path="/register"
             element={<PublicOnlyRoute><Register /></PublicOnlyRoute>}
           />
+          <Route path="/verify-email" element={<VerifyEmail />} />
         </Route>
 
         {/* Student routes */}
